@@ -214,3 +214,7 @@ No usage numbers appear anywhere; every piece says outcome data is just starting
 - Test lookups made while building this kit are listed in `test-lookups.txt` (kept on the build box only, git-ignored and not in the public repo; all `log_miss:false`, no outcome reports).
   Delete those rows from the prod `lookups` table if you want clean counts.
 - Bump `version` in `mcp/server.json` and re-run `./registry-dns.sh publish` when the server's tools change.
+
+### 2026-10-28 (registries)
+- npm: `breakwire@0.1.0` published by npm account `breakwire` (granular token, expires 2027-01-26; move to npm trusted publishing before Jan 2027).
+- PyPI: `breakwire@0.1.0` and `langchain-breakwire@0.1.0` published from `.github/workflows/pypi-publish.yml` via PyPI trusted publishing (account `breakwire`, 2FA on, environment `pypi`).
