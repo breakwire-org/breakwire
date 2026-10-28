@@ -109,6 +109,8 @@ The registry doesn't probe the endpoint, but directories that ingest it do, so k
 to only one server name. Optional later: add `"repository": {"url": "https://github.com/breakwire-org/breakwire", "source": "github"}`
 only if the server source becomes public there (the kit repo is clients, not the server, so I left it out).
 
+NOTES: step 2 DONE 2026-10-28. `org.breakwire/breakwire@0.3.2` is live in the official MCP Registry (https://registry.modelcontextprotocol.io/v0/servers/org.breakwire%2Fbreakwire/versions/latest). Apex TXT added on breakwire.org; private key: `/workspace/agent-news/.secrets/mcp-registry-ed25519.pem` (outside this repo, chmod 600).
+
 ## 3. GitHub Action release (account: GitHub `breakwire-org`)
 
 ```bash
