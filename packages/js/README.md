@@ -51,6 +51,13 @@ try {
 - `timeoutMs` (default 2500) bounds the extra wait. A timeout, network failure, rate limit or bad response sets
   `err.breakwire.error` and rethrows your error unchanged.
 - `shouldLookup: (err) => boolean` skips errors you don't want looked up. `onMatch(info, err)` is a hook for logging.
+- **Privacy by default (0.2.0):** the error-path helpers (`withBreakwire`, `breakwireFetch`, `explain`) send
+  `no_log`, so the server answers but stores nothing about the lookup. Pass `noLog: false` to let misses count as
+  anonymous coverage gaps (and get a `lookupId` you can close). `autoReport: true` implies `noLog: false`.
+- **Local cache (0.2.0):** results are cached in memory by redacted error text + service (default 10 min, 200
+  entries), so retry loops don't repeat the request. `cache: { ttlMs, max }` tunes it, `cache: false` turns it off,
+  `clearBreakwireCache()` empties it. `info.cached` tells you a result came from the cache.
+- `info.remember` is one short line worth saving in agent memory (when to consult Breakwire again).
 
 ### Retry with the fix, and (opt-in) report whether it worked
 
@@ -88,6 +95,28 @@ await bw.report('AN-2026-0025', 'confirmed', env); // claim report, needs apiKey
 ```
 
 `report()` is for outcomes you actually observed. Please don't send test reports.
+
+`stack()` also takes raw files: `bw.stack({ files: { 'package.json': text, '.github/workflows/ci.yml': yml } })`
+(package.json, requirements*.txt, pyproject.toml, .nvmrc, vercel.json, netlify.toml, workflow YAML). An empty stack
+returns 200 with `{ empty: true, hint }`.
+
+## Stack alerts (0.2.0): register once, get told before a deadline hits
+
+```ts
+const sub = await bw.subscribe({ files: { 'package.json': pkgText } }, { horizonDays: 30 /*, webhookUrl */ });
+// store sub.id and sub.manage_token (shown once). No email or personal data is asked for.
+const feed = await bw.alerts(sub.id);       // poll before deploys or weekly; feed.alerts first, then applicable
+// Atom / RSS: sub.feed.atom, sub.feed.rss
+await bw.updateSubscription(sub.id, sub.manage_token, { horizon_days: 60 });
+await bw.unsubscribe(sub.id, sub.manage_token);
+```
+
+Optional webhooks must answer a signed verify POST (2xx with the challenge in the body). Deliveries are signed:
+
+```ts
+import { verifyWebhookSignature } from 'breakwire';
+const ok = await verifyWebhookSignature(sub.webhook.secret, req.headers.get('x-breakwire-signature'), rawBody);
+```
 
 ## Vercel AI SDK tools
 

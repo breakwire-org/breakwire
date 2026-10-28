@@ -8,9 +8,9 @@ pip install langchain-breakwire
 ```
 
 ```python
-from langchain_breakwire import BreakwireLookupTool, BreakwireDeadlinesTool, BreakwireCallbackHandler
+from langchain_breakwire import breakwire_tools, BreakwireCallbackHandler
 
-tools = [BreakwireLookupTool(), BreakwireDeadlinesTool()]      # give them to your agent
+tools = breakwire_tools()      # lookup_error, deadlines, check_stack (one shared client); give them to your agent
 
 handler = BreakwireCallbackHandler(service="openai-api")
 try:
@@ -23,8 +23,12 @@ except Exception as e:
 - `BreakwireLookupTool` (`breakwire_lookup_error`): error text (+ optional service, sdk, sdk_version, model) → compact
   matches with id, confidence, fix, source URL. Unmatched errors are not logged unless `log_miss=True`.
 - `BreakwireDeadlinesTool` (`breakwire_deadlines`): upcoming act-by dates for a service.
+- `BreakwireStackTool` (`breakwire_check_stack`, 0.2.0): a package list or raw package.json / requirements.txt /
+  pyproject.toml / workflow files → the deadlines, breaking changes and advisories that apply, soonest first.
 - `BreakwireCallbackHandler`: `on_llm_error` / `on_tool_error` / `on_chain_error`; each exception is looked up once even
   though LangChain reports it at every nesting level. Never raises, never changes the error. `on_match(info, error)` hook.
+  0.2.0: sends `no_log=True` by default (nothing stored server-side); `no_log=False` to contribute misses as gaps.
+- Tool results include `remember`: one short line the agent can save to memory (when to consult Breakwire again).
 
 Built on the stdlib-only [`breakwire`](https://pypi.org/project/breakwire/) client, which strips secrets before sending.
 Breakwire's community verification has just started; claims link primary sources, prefer those.

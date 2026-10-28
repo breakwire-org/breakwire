@@ -1,6 +1,6 @@
 import { redactSecrets } from './redact.js';
 
-export const VERSION = '0.1.0';
+export const VERSION = '0.2.0';
 export const DEFAULT_BASE_URL = 'https://breakwire.org';
 
 type FetchLike = (input: string, init?: any) => Promise<any>;
@@ -32,6 +32,11 @@ export interface LookupOptions {
   crossService?: boolean;
   /** Log an unmatched error (redacted, anonymous) so clusters surface on /unexplained. Default true. */
   logMiss?: boolean;
+  /**
+   * Privacy mode: the server answers but stores nothing about this lookup (no lookup row, no gap, no lookup_id to
+   * close). The error-path helpers (withBreakwire, breakwireFetch, explain, installBreakwire) default to true.
+   */
+  noLog?: boolean;
 }
 
 export interface Verification { status: string; reports: number; independent_operators: number; [k: string]: unknown }
@@ -43,7 +48,25 @@ export interface Match {
 export interface LookupResult {
   lookup_id: string; normalized: string; explained: boolean; service: string | null;
   coverage: { service: string; covered: boolean; note: string | null; covered_services?: string[] } | null;
-  matches: Match[]; unexplained: unknown; close_the_loop: unknown; [k: string]: unknown;
+  matches: Match[]; unexplained: unknown; close_the_loop: unknown;
+  /** One short line to save in agent memory: when to consult Breakwire again. */
+  remember?: string;
+  [k: string]: unknown;
+}
+/** Input for stack() / subscribe(): any mix of parsed fields and raw files (package.json, requirements*.txt,
+ * pyproject.toml, .nvmrc, vercel.json, netlify.toml, .github/workflows/*.yml). Only dependency facts are kept. */
+export interface StackInput {
+  dependencies?: Record<string, string>; devDependencies?: Record<string, string>; engines?: Record<string, string>;
+  packages?: string[]; services?: string[]; runtime?: string;
+  files?: Record<string, string> | Array<{ path: string; content: string }>;
+  package_json?: string | object; requirements_txt?: string; pyproject_toml?: string;
+  [k: string]: unknown;
+}
+export interface SubscribeOptions {
+  /** Alert this many days ahead of a deadline (1-180, default 30). */
+  horizonDays?: number;
+  /** Optional https webhook. It must answer the signed verify POST (2xx, body containing the challenge). */
+  webhookUrl?: string;
 }
 export type Outcome = 'fixed' | 'not_fixed' | 'confirmed' | 'disputed';
 export interface ReportEnv { sdk?: string; sdk_version?: string; model?: string; runtime?: string; tested_at?: string; [k: string]: string | undefined }
@@ -102,10 +125,11 @@ export class Breakwire {
   /** Strip secrets with the built-in rules plus your configured extra secrets. */
   redact(text: unknown): string { return redactSecrets(text, this.secrets); }
 
-  async request<T = any>(method: string, path: string, body?: unknown, auth = false): Promise<T> {
+  async request<T = any>(method: string, path: string, body?: unknown, auth = false, bearer?: string): Promise<T> {
     const headers: Record<string, string> = { accept: 'application/json', 'user-agent': this.ua };
     if (body !== undefined) headers['content-type'] = 'application/json';
     if (auth && this.apiKey) headers.authorization = `Bearer ${this.apiKey}`;
+    if (bearer) headers.authorization = `Bearer ${bearer}`;
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), this.timeoutMs);
     try {
@@ -140,6 +164,7 @@ export class Breakwire {
     if (opts.context) body.context = this.redact(opts.context).slice(0, 1000);
     if (opts.crossService) body.cross_service = true;
     if (opts.logMiss === false) body.log_miss = false;
+    if (opts.noLog) body.no_log = true;
     return this.request<LookupResult>('POST', '/api/lookup', body);
   }
 
@@ -181,11 +206,62 @@ export class Breakwire {
     return Promise.reject(new TypeError(`breakwire: report target must be a lookup id (lk_...) or claim id (AN-...): ${target}`));
   }
 
-  /** package.json fields or ["name@version", ...] -> applicable deadlines, advisories and breaking changes. */
-  stack(input: { dependencies?: Record<string, string>; devDependencies?: Record<string, string>; engines?: Record<string, string>; packages?: string[] }): Promise<any> {
+  /** package.json fields, raw files or ["name@version", ...] -> applicable deadlines, advisories and breaking changes.
+   * An empty stack returns 200 with { empty: true, hint }. */
+  stack(input: StackInput): Promise<any> {
     return this.request('POST', '/api/stack', input);
+  }
+
+  /**
+   * Register a stack once and get alerts when a deadline or breaking change that affects it comes up.
+   * Returns { id, manage_token (shown once: store it), feed: {json, atom, rss, status}, webhook?: {status, secret}, now, remember }.
+   * No email or personal data is asked for or stored; only dependency facts from the input are kept.
+   */
+  subscribe(input: StackInput, opts: SubscribeOptions = {}): Promise<any> {
+    const body: Record<string, unknown> = { ...input };
+    if (opts.horizonDays) body.horizon_days = opts.horizonDays;
+    if (opts.webhookUrl) body.webhook_url = opts.webhookUrl;
+    return this.request('POST', '/api/subscriptions', body);
+  }
+
+  /** Pull alerts for a subscription (JSON). Poll before deploys or about weekly; alerts come first. */
+  alerts(subscriptionId: string): Promise<any> {
+    if (!/^sub_[A-Za-z0-9_-]{20,40}$/.test(subscriptionId)) return Promise.reject(new TypeError(`breakwire: not a subscription id: ${subscriptionId}`));
+    return this.request('GET', `/api/subscriptions/${subscriptionId}/feed`);
+  }
+
+  /** Change the stack, horizon or webhook (webhookUrl null removes it). Needs the manage_token from subscribe(). */
+  updateSubscription(subscriptionId: string, manageToken: string, patch: StackInput & { horizon_days?: number; webhook_url?: string | null }): Promise<any> {
+    return this.request('PATCH', `/api/subscriptions/${subscriptionId}`, patch, false, manageToken);
+  }
+
+  /** Delete a subscription (clears the stored stack and webhook URL). Needs the manage_token. */
+  unsubscribe(subscriptionId: string, manageToken: string): Promise<any> {
+    return this.request('DELETE', `/api/subscriptions/${subscriptionId}`, undefined, false, manageToken);
   }
 
   /** Covered services with counts and aliases. */
   services(): Promise<any> { return this.request('GET', '/api/services'); }
+}
+
+/**
+ * Verify a Breakwire webhook (X-Breakwire-Signature: t=<unix>,v1=<hex HMAC-SHA256(secret, t + "." + rawBody)>).
+ * Pass the raw request body string. Rejects signatures older than toleranceSec (default 300). Uses WebCrypto.
+ */
+export async function verifyWebhookSignature(secret: string, signatureHeader: string | null | undefined, rawBody: string, toleranceSec = 300): Promise<boolean> {
+  try {
+    const m = /t=(\d+),v1=([0-9a-f]{64})/.exec(String(signatureHeader || ''));
+    if (!m) return false;
+    const t = Number(m[1]);
+    if (!Number.isFinite(t) || Math.abs(Date.now() / 1000 - t) > toleranceSec) return false;
+    const subtle = (globalThis as any).crypto?.subtle;
+    if (!subtle) return false;
+    const enc = new TextEncoder();
+    const key = await subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+    const mac = new Uint8Array(await subtle.sign('HMAC', key, enc.encode(`${m[1]}.${rawBody}`)));
+    const hex = Array.from(mac, (b) => b.toString(16).padStart(2, '0')).join('');
+    let diff = 0;
+    for (let i = 0; i < 64; i++) diff |= hex.charCodeAt(i) ^ m[2].charCodeAt(i);
+    return diff === 0;
+  } catch { return false; }
 }

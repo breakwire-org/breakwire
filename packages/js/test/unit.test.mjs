@@ -2,7 +2,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { Breakwire, withBreakwire, breakwireFetch, explain, redactSecrets, errorText, DEFAULT_BASE_URL } from '../dist/esm/index.js';
+import { Breakwire, withBreakwire, breakwireFetch, explain, redactSecrets, errorText, DEFAULT_BASE_URL, verifyWebhookSignature, clearBreakwireCache, VERSION } from '../dist/esm/index.js';
+import { createHmac } from 'node:crypto';
 import { createRequire } from 'node:module';
 
 const cases = JSON.parse(readFileSync(new URL('../../../tests/redaction-cases.json', import.meta.url)));
@@ -187,6 +188,7 @@ test('breakwireFetch: error responses get res.breakwire, body still readable; ne
 });
 
 test('explain never throws', async () => {
+  clearBreakwireCache();
   const info = await explain(new Error('x'), { baseUrl: 'https://x.test', fetch: mockFetch(() => { throw new Error('dns'); }) });
   assert.equal(info.id, null); assert.match(info.error, /dns/);
 });
@@ -195,4 +197,61 @@ test('CommonJS build loads', () => {
   const require = createRequire(import.meta.url);
   const cjs = require('../dist/cjs/index.js');
   assert.equal(typeof cjs.withBreakwire, 'function'); assert.equal(typeof cjs.Breakwire, 'function');
+});
+
+// ---- 0.2.0: error-path defaults, cache, subscriptions, webhook verification ----
+test('version is 0.2.0', () => { assert.equal(VERSION, '0.2.0'); });
+
+test('explain(): no-log by default, opt out with noLog:false', async () => {
+  clearBreakwireCache();
+  const f = mockFetch(() => ({ body: LOOKUP }));
+  await explain(new Error('boom unique 1'), { fetch: f, cache: false });
+  assert.equal(f.calls[0].body.no_log, true);
+  await explain(new Error('boom unique 2'), { fetch: f, cache: false, noLog: false });
+  assert.equal(f.calls[1].body.no_log, undefined);
+});
+
+test('explain(): local cache avoids repeat lookups and marks cached', async () => {
+  clearBreakwireCache();
+  const f = mockFetch(() => ({ body: { ...LOOKUP, remember: 'check Breakwire first' } }));
+  const a = await explain(new Error('same error text'), { fetch: f });
+  const b = await explain(new Error('same error text'), { fetch: f });
+  assert.equal(f.calls.length, 1);
+  assert.equal(b.cached, true); assert.equal(a.remember, 'check Breakwire first');
+  await explain(new Error('same error text'), { fetch: f, cache: false });
+  assert.equal(f.calls.length, 2);
+});
+
+test('explain(): Breakwire failure is not cached', async () => {
+  clearBreakwireCache();
+  let n = 0;
+  const f = mockFetch(() => (n++ === 0 ? { status: 503, body: { error: 'down' } } : { body: LOOKUP }));
+  const a = await explain(new Error('flaky'), { fetch: f });
+  assert.ok(a.error);
+  const b = await explain(new Error('flaky'), { fetch: f });
+  assert.ok(!b.error); assert.equal(f.calls.length, 2);
+});
+
+test('subscribe/alerts/unsubscribe send the right requests', async () => {
+  const f = mockFetch((c) => ({ body: c.method === 'POST' ? { id: 'sub_aaaaaaaaaaaaaaaaaaaaaaaa', manage_token: 'bwm_x' } : { ok: true } }));
+  const bw = new Breakwire({ fetch: f });
+  const s = await bw.subscribe({ files: { 'package.json': '{"dependencies":{"next":"16.0.0"}}' } }, { horizonDays: 14 });
+  assert.equal(f.calls[0].url, DEFAULT_BASE_URL + '/api/subscriptions');
+  assert.equal(f.calls[0].body.horizon_days, 14);
+  await bw.alerts(s.id);
+  assert.equal(f.calls[1].url, DEFAULT_BASE_URL + '/api/subscriptions/sub_aaaaaaaaaaaaaaaaaaaaaaaa/feed');
+  await bw.unsubscribe(s.id, 'bwm_x');
+  assert.equal(f.calls[2].method, 'DELETE'); assert.equal(f.calls[2].headers.authorization, 'Bearer bwm_x');
+  await assert.rejects(bw.alerts('nope'));
+});
+
+test('verifyWebhookSignature matches the server scheme and rejects tampering/staleness', async () => {
+  const secret = 'whsec_test', body = '{"type":"stack.alerts"}', t = Math.floor(Date.now() / 1000);
+  const sig = createHmac('sha256', secret).update(`${t}.${body}`).digest('hex');
+  assert.equal(await verifyWebhookSignature(secret, `t=${t},v1=${sig}`, body), true);
+  assert.equal(await verifyWebhookSignature(secret, `t=${t},v1=${sig}`, body + ' '), false);
+  assert.equal(await verifyWebhookSignature('other', `t=${t},v1=${sig}`, body), false);
+  const old = t - 1000, sigOld = createHmac('sha256', secret).update(`${old}.${body}`).digest('hex');
+  assert.equal(await verifyWebhookSignature(secret, `t=${old},v1=${sigOld}`, body), false);
+  assert.equal(await verifyWebhookSignature(secret, null, body), false);
 });

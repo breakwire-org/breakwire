@@ -5,8 +5,8 @@
     r = bw.lookup(exc, service="anthropic-api", log_miss=False)
 """
 from ._redact import redact_secrets
-from .client import DEFAULT_BASE_URL, Breakwire, BreakwireError, __version__, error_text
-from .wrap import SKIP, BreakwireInfo, explain, with_breakwire
+from .client import DEFAULT_BASE_URL, Breakwire, BreakwireError, __version__, error_text, verify_webhook_signature
+from .wrap import SKIP, BreakwireInfo, clear_cache, explain, with_breakwire
 
 __all__ = ["Breakwire", "BreakwireError", "BreakwireInfo", "DEFAULT_BASE_URL", "SKIP", "error_text", "explain",
-           "redact_secrets", "with_breakwire", "__version__"]
+           "redact_secrets", "with_breakwire", "verify_webhook_signature", "clear_cache", "__version__"]

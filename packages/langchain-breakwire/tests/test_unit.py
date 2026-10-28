@@ -9,7 +9,7 @@ sys.path.insert(0, str(ROOT.parent / "python" / "src"))
 
 from langchain_core.runnables import RunnableLambda  # noqa: E402
 from breakwire import Breakwire  # noqa: E402
-from langchain_breakwire import BreakwireCallbackHandler, BreakwireDeadlinesTool, BreakwireLookupTool  # noqa: E402
+from langchain_breakwire import BreakwireCallbackHandler, BreakwireDeadlinesTool, BreakwireLookupTool, BreakwireStackTool, breakwire_tools, __version__  # noqa: E402
 
 LOOKUP = {"lookup_id": "lk_x", "explained": True, "coverage": None,
           "matches": [{"cid": "AN-2026-0025", "title": "T", "confidence": "signature", "fix": "F", "url": "U", "source_url": "S", "deadline": None}]}
@@ -26,6 +26,13 @@ class Fake(Breakwire):
             raise RuntimeError("down")
         return LOOKUP
 
+    def stack(self, **kw):
+        self.calls.append(("stack", None, kw))
+        if not any(kw.values()):
+            return {"empty": True, "hint": "send packages or files"}
+        return {"applicable": [{"cid": "AN-2026-0080", "title": "Node 20 EOL", "deadline": "2026-04-30", "days_left": -181, "fix": "F", "url": "U"}],
+                "subscribe": {"how": "POST /api/subscriptions"}, "remember": "R"}
+
     def deadlines(self, service=None, **kw):
         self.calls.append(("deadlines", service, kw))
         return [{"cid": "AN-2026-0004", "title": "D", "deadline": "2026-11-30", "fix": "F", "url": "U"}]
@@ -40,6 +47,21 @@ class T(unittest.TestCase):
         self.assertEqual(f.calls[0][2]["service"], "anthropic-api")
         self.assertFalse(f.calls[0][2]["log_miss"])
         self.assertIn("error", t.args)
+
+    def test_stack_tool_and_bundle(self):
+        f = Fake()
+        out = BreakwireStackTool(client=f).invoke({"packages": ["node@20"]})
+        self.assertEqual(out["applicable"][0]["id"], "AN-2026-0080")
+        self.assertEqual(out["remember"], "R")
+        self.assertTrue(BreakwireStackTool(client=f).invoke({})["empty"])
+        names = [t.name for t in breakwire_tools(client=f)]
+        self.assertEqual(names, ["breakwire_lookup_error", "breakwire_deadlines", "breakwire_check_stack"])
+        self.assertEqual(__version__, "0.2.0")
+
+    def test_callback_handler_no_log_default(self):
+        f = Fake()
+        h = BreakwireCallbackHandler(client=f)
+        self.assertTrue(h.lookup["no_log"])
 
     def test_lookup_tool_never_raises(self):
         out = BreakwireLookupTool(client=Fake(fail=True)).invoke({"error": "boom"})

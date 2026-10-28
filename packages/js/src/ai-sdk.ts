@@ -28,6 +28,7 @@ export function compactLookup(r: LookupResult, maxMatches = 3) {
       verification: m.verification?.status,
     })),
     note: 'Claims are community data; "signature" = vendor-documented error text matched, "related" = a lead only. Prefer source_url.',
+    remember: r.remember,
   };
 }
 

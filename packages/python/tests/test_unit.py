@@ -10,7 +10,7 @@ import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "src"))
-from breakwire import SKIP, Breakwire, BreakwireError, DEFAULT_BASE_URL, error_text, explain, redact_secrets, with_breakwire  # noqa: E402
+from breakwire import SKIP, Breakwire, BreakwireError, DEFAULT_BASE_URL, clear_cache, error_text, explain, redact_secrets, verify_webhook_signature, with_breakwire, __version__  # noqa: E402
 
 CASES = json.loads((pathlib.Path(__file__).resolve().parents[3] / "tests" / "redaction-cases.json").read_text())
 LOOKUP = {"lookup_id": "lk_abc123", "explained": True, "coverage": None, "matches": [
@@ -47,7 +47,7 @@ class Server:
                     return self._send(200, LOOKUP)
                 return self._send(200, {"ok": True})
 
-            do_GET = do_POST = _go
+            do_GET = do_POST = do_PATCH = do_DELETE = _go
 
             def _send(self, code, obj):
                 data = json.dumps(obj).encode()
@@ -73,6 +73,7 @@ class T(unittest.TestCase):
     def setUp(self):
         S.calls.clear()
         S.mode = "ok"
+        clear_cache()
 
     def test_redaction_cases(self):
         for c in CASES:
@@ -294,6 +295,59 @@ class T(unittest.TestCase):
         o2 = asyncio.run(main())
         self.assertEqual(orig.breakwire.id, "AN-2026-0025")
         self.assertEqual(o2.breakwire.id, "AN-2026-0025")
+
+    # ---- 0.2.0 ----
+    def test_version(self):
+        self.assertEqual(__version__, "0.2.0")
+
+    def test_explain_no_log_default_and_cache(self):
+        clear_cache()
+        a = explain(ValueError("same text 020"), client=bw())
+        b = explain(ValueError("same text 020"), client=bw())
+        lookups = [c for c in S.calls if c["path"] == "/api/lookup"]
+        self.assertEqual(len(lookups), 1)
+        self.assertTrue(lookups[0]["body"]["no_log"])
+        self.assertTrue(b.cached)
+        self.assertFalse(a.cached)
+        explain(ValueError("same text 020"), client=bw(), cache=False, no_log=False)
+        lookups = [c for c in S.calls if c["path"] == "/api/lookup"]
+        self.assertEqual(len(lookups), 2)
+        self.assertNotIn("no_log", lookups[1]["body"])
+
+    def test_failure_not_cached(self):
+        clear_cache()
+        S.mode = "500"
+        self.assertIsNotNone(explain(ValueError("flaky 020"), client=bw()).error)
+        S.mode = "ok"
+        self.assertIsNone(explain(ValueError("flaky 020"), client=bw()).error)
+
+    def test_subscribe_alerts_unsubscribe(self):
+        B = bw()
+        B.subscribe(files={"requirements.txt": "mcp==1.9.0\n"}, horizon_days=14)
+        c = S.calls[-1]
+        self.assertEqual((c["method"], c["path"]), ("POST", "/api/subscriptions"))
+        self.assertEqual(c["body"], {"files": {"requirements.txt": "mcp==1.9.0\n"}, "horizon_days": 14})
+        sid = "sub_" + "a" * 24
+        B.alerts(sid)
+        self.assertEqual(S.calls[-1]["path"], f"/api/subscriptions/{sid}/feed")
+        B.unsubscribe(sid, "bwm_x")
+        c = S.calls[-1]
+        self.assertEqual(c["method"], "DELETE")
+        self.assertEqual(c["headers"].get("authorization") or c["headers"].get("Authorization"), "Bearer bwm_x")
+        with self.assertRaises(ValueError):
+            B.alerts("nope")
+
+    def test_verify_webhook_signature(self):
+        import hashlib, hmac as _h
+        t = str(int(time.time())); body = '{"type":"stack.alerts"}'
+        sig = _h.new(b"whsec_t", f"{t}.{body}".encode(), hashlib.sha256).hexdigest()
+        self.assertTrue(verify_webhook_signature("whsec_t", f"t={t},v1={sig}", body))
+        self.assertFalse(verify_webhook_signature("whsec_t", f"t={t},v1={sig}", body + " "))
+        self.assertFalse(verify_webhook_signature("other", f"t={t},v1={sig}", body))
+        old = str(int(time.time()) - 1000)
+        sig2 = _h.new(b"whsec_t", f"{old}.{body}".encode(), hashlib.sha256).hexdigest()
+        self.assertFalse(verify_webhook_signature("whsec_t", f"t={old},v1={sig2}", body))
+        self.assertFalse(verify_webhook_signature("whsec_t", None, body))
 
     def test_unknown_option_rejected(self):
         with self.assertRaises(TypeError):

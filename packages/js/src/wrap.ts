@@ -1,4 +1,4 @@
-import { Breakwire, BreakwireOptions, LookupOptions, LookupResult, Match, ReportEnv } from './client.js';
+import { Breakwire, BreakwireOptions, LookupOptions, LookupResult, Match, ReportEnv, errorText } from './client.js';
 
 /** What gets attached to an error as `err.breakwire`. */
 export interface BreakwireInfo {
@@ -10,6 +10,10 @@ export interface BreakwireInfo {
   id: string | null; title: string | null; fix: string | null; confidence: string | null; url: string | null; deadline: string | null;
   matches: Match[];
   coverage: LookupResult['coverage'];
+  /** Short line to save in agent memory: when to consult Breakwire again. */
+  remember: string | null;
+  /** true when this info came from the local cache (no request was made). */
+  cached?: boolean;
   /** Set when Breakwire itself failed (timeout, network, rate limit). The original error is still thrown. */
   error?: string;
 }
@@ -19,6 +23,11 @@ export interface WrapOptions extends BreakwireOptions, LookupOptions {
   client?: Breakwire;
   /** Lookup timeout in ms (default 2500). The original error is rethrown after at most this long. */
   timeoutMs?: number;
+  /**
+   * Local cache of lookup results keyed by the redacted error text + service, so a retry loop does not repeat the
+   * same request. Default { ttlMs: 600000, max: 200 }; false turns it off.
+   */
+  cache?: false | { ttlMs?: number; max?: number };
   /** Only look up errors for which this returns true (e.g. skip your own validation errors). */
   shouldLookup?: (err: unknown) => boolean;
   /** Called with the match info (after it is attached to the error). Errors thrown here are ignored. */
@@ -37,14 +46,29 @@ export interface WrapOptions extends BreakwireOptions, LookupOptions {
   reportEnv?: ReportEnv;
 }
 
-const clientCache = new WeakMap<object, Breakwire>();
+type CacheEntry = { at: number; info: BreakwireInfo };
+const resultCache = new Map<string, CacheEntry>();
+
+function cacheGet(key: string, ttl: number): BreakwireInfo | null {
+  const e = resultCache.get(key);
+  if (!e) return null;
+  if (Date.now() - e.at > ttl) { resultCache.delete(key); return null; }
+  resultCache.delete(key); resultCache.set(key, e); // LRU touch
+  return { ...e.info, cached: true };
+}
+function cachePut(key: string, info: BreakwireInfo, max: number): void {
+  resultCache.set(key, { at: Date.now(), info });
+  while (resultCache.size > max) resultCache.delete(resultCache.keys().next().value as string);
+}
+/** Drop every locally cached lookup result. */
+export function clearBreakwireCache(): void { resultCache.clear(); }
 
 function makeInfo(r: LookupResult | null, error?: string): BreakwireInfo {
   const m = r?.matches?.[0];
   return {
     lookupId: r?.lookup_id ?? null, explained: !!r?.explained,
     id: m?.cid ?? null, title: m?.title ?? null, fix: m?.fix ?? null, confidence: m?.confidence ?? null, url: m?.url ?? null, deadline: m?.deadline ?? null,
-    matches: r?.matches ?? [], coverage: r?.coverage ?? null, ...(error ? { error } : {}),
+    matches: r?.matches ?? [], coverage: r?.coverage ?? null, remember: (r?.remember as string | undefined) ?? null, ...(error ? { error } : {}),
   };
 }
 
@@ -56,17 +80,27 @@ function attach(err: unknown, info: BreakwireInfo): void {
 
 /**
  * Look up an error and return match info. Never throws: Breakwire failures come back as info.error.
- * Bounded by opts.timeoutMs (default 2500 ms).
+ * Bounded by opts.timeoutMs (default 2500 ms). Privacy: no-log by default (the server stores nothing about the
+ * lookup); pass noLog: false to log misses as anonymous coverage gaps and get a lookup_id you can close with report().
+ * Results are cached locally (see WrapOptions.cache).
  */
 export async function explain(err: unknown, opts: WrapOptions = {}): Promise<BreakwireInfo> {
   try {
     const timeoutMs = opts.timeoutMs ?? 2500;
     const client = opts.client || new Breakwire({ ...opts, timeoutMs });
+    // autoReport needs a lookup_id to close, so it implies logging unless noLog is set explicitly.
+    const lookupOpts: WrapOptions = { ...opts, noLog: opts.noLog ?? !opts.autoReport };
+    const useCache = opts.cache !== false && !opts.autoReport;
+    const cfg = opts.cache || {}; const ttl = cfg.ttlMs ?? 600000, max = cfg.max ?? 200;
+    const key = useCache ? `${client.baseUrl}|${opts.service || ''}|${lookupOpts.noLog ? 1 : 0}|${client.redact(errorText(err)).slice(0, 2000)}` : '';
+    if (useCache) { const hit = cacheGet(key, ttl); if (hit) return hit; }
     let timer: any;
     const timeout = new Promise<never>((_, rej) => { timer = setTimeout(() => rej(new Error(`breakwire lookup timed out after ${timeoutMs} ms`)), timeoutMs); });
     try {
-      const r = await Promise.race([client.lookup(err, opts), timeout]);
-      return makeInfo(r);
+      const r = await Promise.race([client.lookup(err, lookupOpts), timeout]);
+      const info = makeInfo(r);
+      if (useCache) cachePut(key, info, max);
+      return info;
     } finally { clearTimeout(timer); }
   } catch (e: any) {
     return makeInfo(null, String(e?.message || e));
@@ -75,7 +109,8 @@ export async function explain(err: unknown, opts: WrapOptions = {}): Promise<Bre
 
 /**
  * Wrap an async function. On a thrown error, Breakwire looks it up, attaches `err.breakwire` (id, fix, confidence, ...)
- * and rethrows the ORIGINAL error. Breakwire problems never replace or mask your error.
+ * and rethrows the ORIGINAL error. Breakwire problems never replace or mask your error. Opt-in by construction: nothing
+ * is sent unless the wrapped call throws. No-log by default; autoReport needs noLog: false (a lookup_id to close).
  *
  *   const create = withBreakwire((p) => anthropic.messages.create(p), { service: 'anthropic-api' });
  *   try { await create(params) } catch (e) { console.log(e.breakwire?.fix) }

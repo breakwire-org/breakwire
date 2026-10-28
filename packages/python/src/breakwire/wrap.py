@@ -6,9 +6,12 @@ import concurrent.futures
 import functools
 import inspect
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional
+import threading
+import time
+from collections import OrderedDict
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from .client import Breakwire
+from .client import Breakwire, error_text
 
 SKIP = object()  # return this from retry() to skip retrying (the original exception is re-raised, nothing reported)
 _pool = concurrent.futures.ThreadPoolExecutor(max_workers=4, thread_name_prefix="breakwire")
@@ -27,6 +30,8 @@ class BreakwireInfo:
     deadline: Optional[str] = None
     matches: List[Dict[str, Any]] = field(default_factory=list)
     coverage: Optional[Dict[str, Any]] = None
+    remember: Optional[str] = None  # one short line worth saving in agent memory
+    cached: bool = False  # True when served from the local cache (no request made)
     error: Optional[str] = None  # set when Breakwire itself failed
 
     @classmethod
@@ -35,7 +40,7 @@ class BreakwireInfo:
         m = (r.get("matches") or [{}])[0] if r.get("matches") else {}
         return cls(lookup_id=r.get("lookup_id"), explained=bool(r.get("explained")), id=m.get("cid"), title=m.get("title"),
                    fix=m.get("fix"), confidence=m.get("confidence"), url=m.get("url"), deadline=m.get("deadline"),
-                   matches=r.get("matches") or [], coverage=r.get("coverage"), error=error)
+                   matches=r.get("matches") or [], coverage=r.get("coverage"), remember=r.get("remember"), error=error)
 
     def note(self) -> Optional[str]:
         if not self.id:
@@ -43,15 +48,50 @@ class BreakwireInfo:
         return f"Breakwire {self.id} ({self.confidence}): {self.title}\n  fix: {self.fix}\n  {self.url}"
 
 
-_LOOKUP_KEYS = ("service", "sdk", "version", "model", "http_status", "context", "cross_service", "log_miss")
+_LOOKUP_KEYS = ("service", "sdk", "version", "model", "http_status", "context", "cross_service", "log_miss", "no_log")
+
+_cache: "OrderedDict[str, Tuple[float, BreakwireInfo]]" = OrderedDict()
+_cache_lock = threading.Lock()
+CACHE_TTL = 600.0  # seconds
+CACHE_MAX = 200
 
 
-def explain(err: Any, client: Optional[Breakwire] = None, timeout: float = 2.5, **lookup: Any) -> BreakwireInfo:
-    """Look up an error. Never raises; returns at most ``timeout`` seconds later."""
+def clear_cache() -> None:
+    """Drop every locally cached lookup result."""
+    with _cache_lock:
+        _cache.clear()
+
+
+def explain(err: Any, client: Optional[Breakwire] = None, timeout: float = 2.5, cache: bool = True, **lookup: Any) -> BreakwireInfo:
+    """Look up an error. Never raises; returns at most ``timeout`` seconds later.
+
+    Privacy: no_log=True by default (the server stores nothing about the lookup); pass no_log=False to let misses
+    count as anonymous coverage gaps and get a lookup_id. Results are cached in-process (10 min, 200 entries) by
+    redacted error text + service; cache=False skips it.
+    """
     try:
         c = client or Breakwire(timeout=timeout)
-        fut = _pool.submit(c.lookup, err, **{k: v for k, v in lookup.items() if k in _LOOKUP_KEYS})
-        return BreakwireInfo.from_result(fut.result(timeout=timeout))
+        kw = {k: v for k, v in lookup.items() if k in _LOOKUP_KEYS}
+        kw.setdefault("no_log", True)
+        key = ""
+        if cache:
+            key = f"{c.base_url}|{kw.get('service') or ''}|{int(bool(kw['no_log']))}|{c.redact(error_text(err))[:2000]}"
+            with _cache_lock:
+                hit = _cache.get(key)
+                if hit and time.monotonic() - hit[0] <= CACHE_TTL:
+                    _cache.move_to_end(key)
+                    info = BreakwireInfo(**{**hit[1].__dict__, "cached": True})
+                    return info
+                if hit:
+                    _cache.pop(key, None)
+        fut = _pool.submit(c.lookup, err, **kw)
+        info = BreakwireInfo.from_result(fut.result(timeout=timeout))
+        if cache:
+            with _cache_lock:
+                _cache[key] = (time.monotonic(), info)
+                while len(_cache) > CACHE_MAX:
+                    _cache.popitem(last=False)
+        return info
     except concurrent.futures.TimeoutError:
         return BreakwireInfo(error=f"breakwire lookup timed out after {timeout} s")
     except Exception as e:  # noqa: BLE001 - Breakwire must never raise into the caller
@@ -91,6 +131,7 @@ class with_breakwire:
     On an exception: looks it up, sets ``exc.breakwire`` (and a traceback note), then re-raises the ORIGINAL exception.
     Options: should_lookup(exc) -> bool; on_match(info, exc); retry(info, exc, *args, **kwargs) -> result or SKIP (decorator only);
     auto_report=True (explicit opt-in) reports the retry's outcome on the lookup; report_env={...}.
+    Privacy: lookups are sent with no_log=True unless you pass no_log=False (auto_report implies no_log=False).
     """
 
     def __init__(self, func: Optional[Callable] = None, *, client: Optional[Breakwire] = None, timeout: float = 2.5,
@@ -134,7 +175,10 @@ class with_breakwire:
             client = self.client
         except Exception:
             return None
-        info = explain(exc, client=client, timeout=self.timeout, **self.lookup)
+        lk = dict(self.lookup)
+        if self.auto_report:
+            lk.setdefault("no_log", False)  # auto_report needs a lookup_id to close
+        info = explain(exc, client=client, timeout=self.timeout, cache=not self.auto_report, **lk)
         _attach(exc, info, self.add_note)
         if self.on_match:
             try:

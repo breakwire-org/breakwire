@@ -51,6 +51,12 @@ Works on sync and `async def` functions. `timeout` (default 2.5 s) bounds the ex
 `e.breakwire.error` and your exception propagates unchanged. `KeyboardInterrupt`/`SystemExit`/`CancelledError` are never
 looked up. Options: `should_lookup(exc)`, `on_match(info, exc)`, `add_note=False`.
 
+**0.2.0 defaults:** lookups from `with_breakwire` / `explain()` are sent with `no_log=True` (the server answers but
+stores nothing); pass `no_log=False` to let misses count as anonymous coverage gaps and get a `lookup_id`
+(`auto_report=True` implies it). Results are cached in-process for 10 minutes (200 entries) by redacted error text +
+service, so retry loops don't repeat the request; `explain(..., cache=False)` skips it, `clear_cache()` empties it.
+`info.remember` is a one-line hint worth saving in agent memory.
+
 ### Retry with the fix, and (opt-in) report whether it worked
 
 ```python
@@ -72,12 +78,28 @@ raised). Nothing is reported otherwise.
 bw.deadlines("openai-api")            # upcoming act-by dates, soonest first
 bw.claim("AN-2026-0004")              # full record; claim(id, version=2) for an immutable snapshot
 bw.stack(packages=["anthropic==2.3.0", "openai>=1"])
+bw.stack(files=Breakwire.files_from("requirements.txt", "pyproject.toml", ".github/workflows/ci.yml"))
 bw.services()
 bw.report("lk_...", "fixed", {"sdk": "openai"})          # close a lookup (anonymous)
 bw.report("AN-2026-0025", "confirmed", env)              # claim report; needs api_key / $BREAKWIRE_API_KEY
 ```
 
-Only report outcomes you actually observed.
+Only report outcomes you actually observed. An empty `stack()` returns `{"empty": True, "hint": ...}` (HTTP 200).
+
+## Stack alerts (0.2.0)
+
+Register a stack once; get told when a deadline or breaking change that affects it comes up. No email or personal data.
+
+```python
+sub = bw.subscribe(files=Breakwire.files_from("requirements.txt", "pyproject.toml"), horizon_days=30)
+# keep sub["id"] and sub["manage_token"] (shown once). Feeds: sub["feed"]["json" | "atom" | "rss"]
+feed = bw.alerts(sub["id"])                      # poll before deploys or weekly; feed["alerts"] first
+bw.update_subscription(sub["id"], sub["manage_token"], horizon_days=60)
+bw.unsubscribe(sub["id"], sub["manage_token"])
+```
+
+Optional `webhook_url=` must answer a signed verify POST (2xx with the challenge in the body). Check deliveries with
+`verify_webhook_signature(secret, headers["X-Breakwire-Signature"], raw_body)` (from `breakwire`).
 
 ## Secret stripping
 

@@ -11,9 +11,10 @@ from typing import Any, Dict, Iterable, List, Optional, Union
 
 from ._redact import redact_secrets
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 DEFAULT_BASE_URL = "https://breakwire.org"
 _CID = re.compile(r"^AN-\d{4}-\d{4,}$")
+_SUB = re.compile(r"^sub_[A-Za-z0-9_-]{20,40}$")
 
 
 class BreakwireError(Exception):
@@ -96,7 +97,7 @@ class Breakwire:
     def redact(self, text: Any) -> str:
         return redact_secrets(text, self.secrets)
 
-    def request(self, method: str, path: str, body: Any = None, auth: bool = False) -> Any:
+    def request(self, method: str, path: str, body: Any = None, auth: bool = False, bearer: Optional[str] = None) -> Any:
         url = self.base_url + path
         data = None if body is None else json.dumps(body).encode()
         headers = {"accept": "application/json", "user-agent": self.user_agent}
@@ -104,6 +105,8 @@ class Breakwire:
             headers["content-type"] = "application/json"
         if auth and self.api_key:
             headers["authorization"] = f"Bearer {self.api_key}"
+        if bearer:
+            headers["authorization"] = f"Bearer {bearer}"
         for _ in range(3):
             req = urllib.request.Request(url, data=data, headers=headers, method=method)
             try:
@@ -129,8 +132,11 @@ class Breakwire:
 
     def lookup(self, error: Any, service: Optional[str] = None, sdk: Optional[str] = None, version: Optional[str] = None,
                model: Optional[str] = None, http_status: Optional[int] = None, context: Optional[str] = None,
-               cross_service: bool = False, log_miss: bool = True) -> Dict[str, Any]:
-        """Match an error (exception or text) against documented signatures and claims. Redacted before sending."""
+               cross_service: bool = False, log_miss: bool = True, no_log: bool = False) -> Dict[str, Any]:
+        """Match an error (exception or text) against documented signatures and claims. Redacted before sending.
+
+        no_log=True: the server answers but stores nothing about this lookup (the error-path helpers default to it).
+        """
         body: Dict[str, Any] = {"error": self.redact(error_text(error))}
         if service:
             body["service"] = service
@@ -149,6 +155,8 @@ class Breakwire:
             body["cross_service"] = True
         if log_miss is False:
             body["log_miss"] = False
+        if no_log:
+            body["no_log"] = True
         return self.request("POST", "/api/lookup", body)
 
     def deadlines(self, service: Optional[str] = None, kind: Optional[str] = None, limit: Optional[int] = None) -> List[Dict[str, Any]]:
@@ -197,18 +205,85 @@ class Breakwire:
         raise ValueError(f"report target must be a lookup id (lk_...) or claim id (AN-...): {target!r}")
 
     def stack(self, dependencies: Optional[Dict[str, str]] = None, dev_dependencies: Optional[Dict[str, str]] = None,
-              engines: Optional[Dict[str, str]] = None, packages: Optional[List[str]] = None) -> Dict[str, Any]:
-        """package.json fields or ["name@version", ...] -> applicable deadlines, advisories and breaking changes."""
-        body: Dict[str, Any] = {}
-        if dependencies:
-            body["dependencies"] = dependencies
-        if dev_dependencies:
-            body["devDependencies"] = dev_dependencies
-        if engines:
-            body["engines"] = engines
-        if packages:
-            body["packages"] = packages
-        return self.request("POST", "/api/stack", body)
+              engines: Optional[Dict[str, str]] = None, packages: Optional[List[str]] = None,
+              files: Optional[Union[Dict[str, str], List[Dict[str, str]]]] = None, **extra: Any) -> Dict[str, Any]:
+        """package.json fields, ["name@version", ...] or raw files -> applicable deadlines, advisories and breaking changes.
+
+        files: {"requirements.txt": text, "pyproject.toml": text, "package.json": text, ".github/workflows/ci.yml": yml}.
+        An empty stack returns 200 with {"empty": True, "hint": ...}.
+        """
+        return self.request("POST", "/api/stack", _stack_body(dependencies, dev_dependencies, engines, packages, files, extra))
+
+    @staticmethod
+    def files_from(*paths: str) -> Dict[str, str]:
+        """Read dependency files from disk into the files= mapping (missing files are skipped; 200 KB cap each)."""
+        out: Dict[str, str] = {}
+        for p in paths:
+            try:
+                with open(p, "r", encoding="utf-8", errors="replace") as fh:
+                    out[p] = fh.read(200_000)
+            except OSError:
+                continue
+        return out
+
+    def subscribe(self, horizon_days: Optional[int] = None, webhook_url: Optional[str] = None, **stack: Any) -> Dict[str, Any]:
+        """Register a stack once; get alerts when a deadline or breaking change that affects it comes up.
+
+        Same stack arguments as stack(). Returns id, manage_token (shown once: store it), feed {json, atom, rss},
+        webhook (if webhook_url: status + secret), now, remember. No email or personal data is asked for.
+        """
+        files = stack.pop("files", None)
+        body = _stack_body(stack.pop("dependencies", None), stack.pop("dev_dependencies", None), stack.pop("engines", None),
+                           stack.pop("packages", None), files, stack)
+        if horizon_days:
+            body["horizon_days"] = int(horizon_days)
+        if webhook_url:
+            body["webhook_url"] = webhook_url
+        return self.request("POST", "/api/subscriptions", body)
+
+    def alerts(self, subscription_id: str) -> Dict[str, Any]:
+        """Pull a subscription's feed (JSON): alerts first, then everything that applies. Poll before deploys or weekly."""
+        if not _SUB.match(subscription_id or ""):
+            raise ValueError(f"not a subscription id: {subscription_id!r}")
+        return self.request("GET", f"/api/subscriptions/{subscription_id}/feed")
+
+    def update_subscription(self, subscription_id: str, manage_token: str, **patch: Any) -> Dict[str, Any]:
+        """Change stack / horizon_days / webhook_url (None removes the webhook). Needs the manage_token."""
+        return self.request("PATCH", f"/api/subscriptions/{subscription_id}", patch, bearer=manage_token)
+
+    def unsubscribe(self, subscription_id: str, manage_token: str) -> Dict[str, Any]:
+        """Delete a subscription (clears the stored stack and webhook URL)."""
+        return self.request("DELETE", f"/api/subscriptions/{subscription_id}", bearer=manage_token)
 
     def services(self) -> Dict[str, Any]:
         return self.request("GET", "/api/services")
+
+
+def _stack_body(dependencies, dev_dependencies, engines, packages, files, extra) -> Dict[str, Any]:
+    body: Dict[str, Any] = {k: v for k, v in (extra or {}).items() if v is not None}
+    if dependencies:
+        body["dependencies"] = dependencies
+    if dev_dependencies:
+        body["devDependencies"] = dev_dependencies
+    if engines:
+        body["engines"] = engines
+    if packages:
+        body["packages"] = packages
+    if files:
+        body["files"] = files
+    return body
+
+
+def verify_webhook_signature(secret: str, signature_header: Optional[str], raw_body: Union[str, bytes], tolerance_sec: int = 300) -> bool:
+    """Verify X-Breakwire-Signature: t=<unix>,v1=<hex HMAC-SHA256(secret, t + "." + raw_body)>. Constant-time compare."""
+    import hashlib
+    import hmac
+    import time
+    m = re.search(r"t=(\d+),v1=([0-9a-f]{64})", signature_header or "")
+    if not m:
+        return False
+    if abs(time.time() - int(m.group(1))) > tolerance_sec:
+        return False
+    body = raw_body.encode() if isinstance(raw_body, str) else raw_body
+    mac = hmac.new(secret.encode(), m.group(1).encode() + b"." + body, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(mac, m.group(2))
