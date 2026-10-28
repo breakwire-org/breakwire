@@ -43,6 +43,11 @@ someone else (hence `breakwire-org`).
 | | 7. Cline marketplace | NOT SUBMITTED: their template requires ticking "I have tested that Cline can successfully set up this server using only the README.md and/or llms-install.md". Test with Cline first, then submit (logo link: https://raw.githubusercontent.com/breakwire-org/breakwire/main/assets/logo-400.png). |
 | | 8. Vercel AI SDK registry | NOT SUBMITTED: their guide requires the package to be published on npm first (and their PR checklist asks for signed commits). Do after step 4. |
 | | 8. LangChain | NOT SUBMITTED: their Integration listing form invites requests but requires confirming the package is on PyPI. Do after step 5. |
+| 15:49 | 0.2.0 kit | Commit d8d7eda pushed: error-path helpers no-log by default + local cache + timeout (JS `withBreakwire`/`breakwireFetch`/`explain`, Python `with_breakwire`/`explain`), `subscribe`/`alerts`/`updateSubscription`/`unsubscribe`, webhook signature verify, `remember`; LangChain `BreakwireStackTool` + `breakwire_tools()`. Tests: JS 26/26, Python 24/24, LangChain 7/7. |
+| 15:50 | 4. npm | `breakwire@0.2.0` published: https://www.npmjs.com/package/breakwire/v/0.2.0 |
+| 15:51 | 5. PyPI | `breakwire 0.2.0` via `gh workflow run pypi-publish.yml -f package=python` (run 40758102973, success): https://pypi.org/project/breakwire/0.2.0/ |
+| 15:52 | 2. MCP Registry | `org.breakwire/breakwire@0.5.0` published with mcp-publisher (DNS auth): tools changed in Breakwire 0.5.0 (subscribe_stack, stack_alerts). |
+| 15:53 | 5. PyPI | `langchain-breakwire 0.2.0` (run 40758230536, success): https://pypi.org/project/langchain-breakwire/0.2.0/ |
 | | Skipped by decision | punkpeye awesome lists, Smithery, modelcontextprotocol/servers, OpenAI Agents SDK, mcpservers.org (form + email), Show HN, X. |
 
 ---
