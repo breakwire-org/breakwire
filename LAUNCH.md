@@ -26,6 +26,25 @@ Name availability checked 2026-10-28: npm `breakwire` and `breakwire-check` free
 `langchain-breakwire` free, MCP Registry has no `org.breakwire/*` server. GitHub user/org `breakwire` is taken by
 someone else (hence `breakwire-org`).
 
+
+## Done log (2026-10-28, times ET)
+
+| When | Step | Result |
+|---|---|---|
+| earlier | 2. Official MCP Registry | `org.breakwire/breakwire@0.3.2` live: https://registry.modelcontextprotocol.io/v0/servers/org.breakwire%2Fbreakwire/versions/latest |
+| 11:26 | 0. Pre-flight | Author metadata set to `Breakwire` (action.yml, package.json, both pyproject.toml); personal mentions say Ethan Hawkes. History rewritten before first push: commits authored `Breakwire <339134107+diffspecter@users.noreply.github.com>` (repo-local config) and `test-lookups.txt` removed from all commits (kept on the box only, git-ignored). gitleaks over full history: only the fake redaction fixtures in tests/ and unit tests. JS (20), action (7) and Python unit tests pass. |
+| 11:27 | 1. GitHub repo | https://github.com/breakwire-org/breakwire (public, homepage https://breakwire.org, topics mcp, mcp-server, ai-agents, breaking-changes, deprecations, api) |
+| 11:28 | 1/3. Action repo + release | https://github.com/breakwire-org/breakwire-check (from `git subtree split --prefix action`, `action.yml` at root). Tags `v1.0.0` and moving `v1`; release https://github.com/breakwire-org/breakwire-check/releases/tag/v1.0.0 |
+| | 3. Marketplace | NOT DONE: needs the web UI checkbox on the release page (plus Marketplace agreement / 2FA). |
+| | 4/5. npm, PyPI | NOT DONE (separate accounts). |
+| | 6. Glama claim | NOT DONE: listing exists (https://glama.ai/mcp/connectors/org.breakwire/breakwire) but the claim token is issued only after signing in to Glama ("Claim ownership"). Then add TXT `_glama-claim.breakwire.org` or `/.well-known/glama.json` with that token. No DNS record added. |
+| 11:29 | 7. Docker MCP catalog | PR https://github.com/docker/mcp-registry/pull/6274 (fork diffspecter/mcp-registry, branch add-breakwire; `task validate` passes, build skipped for remote). |
+| 11:30 | 7. mcp.so | Issue https://github.com/chatmcp/mcpso/issues/6316 (issues are processed by the maintainer; free review). |
+| | 7. Cline marketplace | NOT SUBMITTED: their template requires ticking "I have tested that Cline can successfully set up this server using only the README.md and/or llms-install.md". Test with Cline first, then submit (logo link: https://raw.githubusercontent.com/breakwire-org/breakwire/main/assets/logo-400.png). |
+| | 8. Vercel AI SDK registry | NOT SUBMITTED: their guide requires the package to be published on npm first (and their PR checklist asks for signed commits). Do after step 4. |
+| | 8. LangChain | NOT SUBMITTED: their Integration listing form invites requests but requires confirming the package is on PyPI. Do after step 5. |
+| | Skipped by decision | punkpeye awesome lists, Smithery, modelcontextprotocol/servers, OpenAI Agents SDK, mcpservers.org (form + email), Show HN, X. |
+
 ---
 
 ## 0. Pre-flight (box, no accounts)
