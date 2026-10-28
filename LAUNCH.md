@@ -33,7 +33,7 @@ someone else (hence `breakwire-org`).
 ```bash
 cd /workspace/breakwire-kit
 git status                         # clean, everything committed
-git grep -nE 'sk-ant-|sk-proj-|BEGIN [A-Z ]*PRIVATE KEY|wire-editor' -- . ':!tests/redaction-cases.json' ':!packages/*/test*' || echo "no secrets"
+git grep -nE 'sk-ant-|sk-proj-|BEGIN [A-Z ]*PRIVATE KEY|wire-editor' -- . ':!tests' ':!packages/*/test*' ':!*redact*' ':!LAUNCH.md' || echo "no secrets"   # matches in tests/ and redact sources are fake fixtures
 (cd packages/js && npm ci && npm test)
 (cd packages/python && python3 -m unittest discover -s tests)
 (cd action && npm test)
