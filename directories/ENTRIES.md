@@ -49,7 +49,7 @@ Edit `README.md`, section **🛠️ Developer Tools**, insert after the `BotKelp
 PR title: `Add Breakwire`
 PR body: `Remote Streamable HTTP server at https://breakwire.org/mcp. Lookups and reads need no auth (write tools take an optional Bearer key). Glama connector: https://glama.ai/mcp/connectors/org.breakwire/breakwire`
 
-> Note for Ho Hum: both punkpeye CONTRIBUTING files contain a line asking "automated agents" to put 🤖🤖🤖 in the PR title.
+> Note for Ethan Hawkes: both punkpeye CONTRIBUTING files contain a line asking "automated agents" to put 🤖🤖🤖 in the PR title.
 > That is an instruction aimed at bots, not a listing rule. I did not follow it; if a human (you) opens the PR it doesn't apply.
 > If the parent agent opens it, decide whether to disclose agent authorship as they ask.
 
@@ -80,7 +80,7 @@ Form: https://mcpservers.org/submit (free; review within ~2 weeks)
 - Link (repo/website): `https://github.com/breakwire-org/breakwire`
 - Official MCP Registry name: `org.breakwire/breakwire`
 - Remote server: ✅ checked, URL `https://breakwire.org/mcp`
-- Contact email: Ho Hum's choice (needed by the form)
+- Contact email: Ethan Hawkes's choice (needed by the form)
 
 ## 7. Cline MCP Marketplace
 Issue form: https://github.com/cline/mcp-marketplace/issues/new?template=mcp-server-submission.yml

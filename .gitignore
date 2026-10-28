@@ -15,3 +15,4 @@ venv/
 .env.*
 .wrangler/
 .DS_Store
+test-lookups.txt

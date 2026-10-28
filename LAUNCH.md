@@ -40,8 +40,8 @@ git grep -nE 'sk-ant-|sk-proj-|BEGIN [A-Z ]*PRIVATE KEY|wire-editor' -- . ':!tes
 /tmp/mcpp/mcp-publisher validate mcp/server.json
 curl -s https://breakwire.org/api/stats      # refresh the numbers quoted in launch/show-hn.md
 ```
-Also decide: the MIT copyright line says `Ho Hum` (LICENSE files); `author` in package metadata says `Ho Hum`. Change
-both if it should be a company name. Replace `assets/logo*` if you have a real logo (current one is a simple placeholder:
+Decided 2026-10-28: MIT copyright holder is `Ethan Hawkes` (LICENSE files); `author` in package and action metadata is
+`Breakwire`. Replace `assets/logo*` if you have a real logo (current one is a simple placeholder:
 a broken orange wire with a spark).
 
 ## 1. GitHub repos (account: GitHub, owner/admin of `breakwire-org`)
@@ -109,7 +109,7 @@ The registry doesn't probe the endpoint, but directories that ingest it do, so k
 to only one server name. Optional later: add `"repository": {"url": "https://github.com/breakwire-org/breakwire", "source": "github"}`
 only if the server source becomes public there (the kit repo is clients, not the server, so I left it out).
 
-NOTES: step 2 DONE 2026-10-28. `org.breakwire/breakwire@0.3.2` is live in the official MCP Registry (https://registry.modelcontextprotocol.io/v0/servers/org.breakwire%2Fbreakwire/versions/latest). Apex TXT added on breakwire.org; private key: `/workspace/agent-news/.secrets/mcp-registry-ed25519.pem` (outside this repo, chmod 600).
+NOTES: step 2 DONE 2026-10-28. `org.breakwire/breakwire@0.3.2` is live in the official MCP Registry (https://registry.modelcontextprotocol.io/v0/servers/org.breakwire%2Fbreakwire/versions/latest). Apex TXT added on breakwire.org; private key kept outside this repo on the build box (`.secrets/`, chmod 600).
 
 ## 3. GitHub Action release (account: GitHub `breakwire-org`)
 
@@ -184,7 +184,7 @@ gh pr create --title "Add Breakwire remote MCP server" --body "Remote (streamabl
 - **OpenAI Agents SDK**: don't submit. Non-collaborator PRs aren't accepted, and the only community list is tracing processors.
 - **Anthropic SDK, MCP TS SDK**: no community list exists.
 
-## 9. Posts (accounts: Ho Hum's HN and X)
+## 9. Posts (accounts: Ethan Hawkes's HN and X)
 
 - Show HN: `launch/show-hn.md` (title, URL, text, posting notes). Refresh the numbers from `/api/stats` first.
 - X: `launch/x-post.txt` (278 chars with URLs counted as 23), optional replies in `launch/x-thread-optional.txt`.
@@ -192,6 +192,6 @@ gh pr create --title "Add Breakwire remote MCP server" --body "Remote (streamabl
 No usage numbers appear anywhere; every piece says outcome data is just starting. Keep it that way until there is data.
 
 ## After launch
-- Test lookups made while building this kit are listed in `test-lookups.txt` (all `log_miss:false`, no outcome reports).
+- Test lookups made while building this kit are listed in `test-lookups.txt` (kept on the build box only, git-ignored and not in the public repo; all `log_miss:false`, no outcome reports).
   Delete those rows from the prod `lookups` table if you want clean counts.
 - Bump `version` in `mcp/server.json` and re-run `./registry-dns.sh publish` when the server's tools change.

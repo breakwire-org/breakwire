@@ -35,6 +35,6 @@ https://github.com/breakwire-org/breakwire
 I'd like to hear which services you'd want covered next, and where a match was wrong.
 
 ---
-Posting notes: post from Ho Hum's HN account, Tue–Thu ~8–10am ET; stay in the thread for the first couple of hours.
+Posting notes: post from Ethan Hawkes's HN account, Tue–Thu ~8–10am ET; stay in the thread for the first couple of hours.
 Don't ask anyone to upvote (HN penalizes it). Check the numbers in the text against https://breakwire.org/api/stats
 right before posting (2026-10-28: 104 claims, 46 services, 0 verified, 6 outcome reports).

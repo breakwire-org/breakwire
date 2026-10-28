@@ -10,7 +10,7 @@ readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.9"
-authors = [{ name = "Ho Hum" }]
+authors = [{ name = "Breakwire" }]
 keywords = ["breaking-changes", "deprecations", "errors", "ai-agents", "llm", "mcp", "anthropic", "openai", "gemini"]
 classifiers = [
   "Programming Language :: Python :: 3",

@@ -25,7 +25,7 @@
     "url": "https://github.com/breakwire-org/breakwire/issues"
   },
   "license": "MIT",
-  "author": "Ho Hum",
+  "author": "Breakwire",
   "type": "module",
   "sideEffects": false,
   "main": "./dist/cjs/index.js",

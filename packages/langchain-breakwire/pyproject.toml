@@ -10,7 +10,7 @@ readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.10"
-authors = [{ name = "Ho Hum" }]
+authors = [{ name = "Breakwire" }]
 keywords = ["langchain", "breakwire", "errors", "breaking-changes", "deprecations", "ai-agents"]
 dependencies = ["breakwire>=0.1.0", "langchain-core>=0.3"]
 
