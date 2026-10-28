@@ -1,0 +1,17 @@
+node_modules/
+dist/
+build/
+*.egg-info/
+__pycache__/
+.venv/
+venv/
+*.pyc
+.pytest_cache/
+*.tgz
+*.pem
+*.key
+.secrets/
+.env
+.env.*
+.wrangler/
+.DS_Store

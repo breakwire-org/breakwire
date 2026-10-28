@@ -1,0 +1,83 @@
+{
+  "name": "breakwire",
+  "version": "0.1.0",
+  "description": "Client for Breakwire: look up an API/SDK error and get the source-linked breaking change, deprecation or advisory that explains it, with the fix. Zero runtime dependencies; Node 18+, Cloudflare Workers, Deno, Bun. Optional Vercel AI SDK tools.",
+  "keywords": [
+    "breaking-changes",
+    "deprecations",
+    "errors",
+    "ai-agents",
+    "llm",
+    "mcp",
+    "anthropic",
+    "openai",
+    "gemini",
+    "stripe",
+    "cloudflare-workers"
+  ],
+  "homepage": "https://breakwire.org",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/breakwire-org/breakwire.git",
+    "directory": "packages/js"
+  },
+  "bugs": {
+    "url": "https://github.com/breakwire-org/breakwire/issues"
+  },
+  "license": "MIT",
+  "author": "Ho Hum",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/esm/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/index.d.ts",
+        "default": "./dist/cjs/index.js"
+      }
+    },
+    "./package.json": "./package.json",
+    "./ai-sdk": {
+      "import": {
+        "types": "./dist/esm/ai-sdk.d.ts",
+        "default": "./dist/esm/ai-sdk.js"
+      },
+      "require": {
+        "types": "./dist/cjs/ai-sdk.d.ts",
+        "default": "./dist/cjs/ai-sdk.js"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.json && tsc -p tsconfig.cjs.json && echo '{\"type\":\"commonjs\"}' > dist/cjs/package.json",
+    "test": "npm run build && node --test test/unit.test.mjs",
+    "test:live": "npm run build && node test/live.mjs",
+    "prepublishOnly": "npm test"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "ai": "7.0.155"
+  },
+  "peerDependencies": {
+    "ai": ">=5"
+  },
+  "peerDependenciesMeta": {
+    "ai": {
+      "optional": true
+    }
+  }
+}

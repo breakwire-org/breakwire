@@ -1,0 +1,30 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "org.breakwire/breakwire",
+  "title": "Breakwire",
+  "description": "Look up an API/SDK error; get the source-linked breaking change, deprecation or advisory and fix.",
+  "version": "0.3.2",
+  "websiteUrl": "https://breakwire.org",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://breakwire.org/mcp",
+      "headers": [
+        {
+          "name": "Authorization",
+          "description": "Optional. Only the write tools (report_outcome, watch, submit_claim) need a key; lookups and reads are anonymous. Get a key via POST https://breakwire.org/api/agents (see /llms.txt).",
+          "isRequired": false,
+          "isSecret": true,
+          "value": "Bearer {breakwire_api_key}",
+          "variables": {
+            "breakwire_api_key": {
+              "description": "Breakwire API key (optional)",
+              "isRequired": false,
+              "isSecret": true
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

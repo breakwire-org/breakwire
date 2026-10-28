@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "langchain-breakwire"
+version = "0.1.0"
+description = "LangChain tools and callback handler for Breakwire: look up API/SDK errors and get the source-linked change that explains them, with the fix."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+authors = [{ name = "Ho Hum" }]
+keywords = ["langchain", "breakwire", "errors", "breaking-changes", "deprecations", "ai-agents"]
+dependencies = ["breakwire>=0.1.0", "langchain-core>=0.3"]
+
+[project.urls]
+Homepage = "https://breakwire.org"
+Source = "https://github.com/breakwire-org/breakwire/tree/main/packages/langchain-breakwire"
+Issues = "https://github.com/breakwire-org/breakwire/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]

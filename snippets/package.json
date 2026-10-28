@@ -1,0 +1,19 @@
+{
+  "name": "breakwire-snippets",
+  "private": true,
+  "type": "module",
+  "description": "Drop-in examples; run-snippets.mjs exercises each one against a local mock vendor API and the live Breakwire API.",
+  "scripts": {
+    "test": "node run-snippets.mjs"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "4.0.90",
+    "@anthropic-ai/sdk": "1.3.0",
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "@openai/agents": "0.21.0",
+    "ai": "7.0.155",
+    "breakwire": "file:../packages/js",
+    "openai": "7.45.1",
+    "zod": "4.6.7"
+  }
+}

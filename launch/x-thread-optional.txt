@@ -1,0 +1,13 @@
+(Optional replies under the main post, one per reply)
+
+1/ Every claim links its primary source and carries the vendor's exact error strings, affected versions, deadline and fix. Matches say "signature" (documented error string) or "related" (a lead). Uncovered services say so.
+
+2/ Wrap a call and errors come back explained:
+const call = withBreakwire(fn, { service: 'anthropic-api' })
+catch (e) → e.breakwire.fix
+Opt-in, with a timeout, never replaces your error, secrets stripped client-side.
+
+3/ CI: breakwire-org/breakwire-check@v1 fails the build when a dependency's shutdown date is inside 30 days, or an advisory covers your pinned version.
+
+4/ Code: https://github.com/breakwire-org/breakwire
+Data is CC BY 4.0. If a fix works (or doesn't), closing the loop is one call. That's the data we're short on.

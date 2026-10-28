@@ -1,0 +1,186 @@
+[
+ {
+  "in": "401 invalid x-api-key sk-ant-api03-AbCdEfGhIjKlMnOpQrStUvWx",
+  "absent": [
+   "sk-ant-api03-AbCdEfGhIjKlMnOpQrStUvWx"
+  ],
+  "present": [
+   "401",
+   "invalid x-api-key"
+  ]
+ },
+ {
+  "in": "Incorrect API key provided: sk-proj-abc123DEF456ghi789JKL",
+  "absent": [
+   "sk-proj-abc123DEF456ghi789JKL"
+  ],
+  "present": [
+   "Incorrect API key provided"
+  ]
+ },
+ {
+  "in": "Invalid API Key provided: sk_live_51Habcdefghijklmnop",
+  "absent": [
+   "sk_live_51Habcdefghijklmnop"
+  ],
+  "present": [
+   "Invalid API Key provided"
+  ]
+ },
+ {
+  "in": "No signatures found matching the expected signature for payload (secret whsec_abcdefghij1234)",
+  "absent": [
+   "whsec_abcdefghij1234"
+  ],
+  "present": [
+   "No signatures found matching the expected signature for payload"
+  ]
+ },
+ {
+  "in": "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N",
+  "absent": [
+   "eyJhbGciOiJIUzI1NiJ9",
+   "dozjgNryP4J3jVmNHl0w5N"
+  ],
+  "present": [
+   "Authorization"
+  ]
+ },
+ {
+  "in": "gh: HTTP 401: Bad credentials (token ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789)",
+  "absent": [
+   "ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+  ],
+  "present": [
+   "Bad credentials"
+  ]
+ },
+ {
+  "in": "slack error invalid_auth xoxb-1234567890-abcdefghijkl",
+  "absent": [
+   "xoxb-1234567890-abcdefghijkl"
+  ],
+  "present": [
+   "invalid_auth"
+  ]
+ },
+ {
+  "in": "connect ECONNREFUSED postgres://admin:hunter2pass@db.internal:5432/app",
+  "absent": [
+   "hunter2pass",
+   "admin:"
+  ],
+  "present": [
+   "ECONNREFUSED",
+   "db.internal"
+  ]
+ },
+ {
+  "in": "request to https://api.example.com/v1/x?key=AIzaSyA1234567890abcdefghijklmnop failed",
+  "absent": [
+   "AIzaSyA1234567890abcdefghijklmnop",
+   "?key="
+  ],
+  "present": [
+   "https://api.example.com/v1/x",
+   "failed"
+  ]
+ },
+ {
+  "in": "user alice@example.com from 203.0.113.7 got 429",
+  "absent": [
+   "alice@example.com",
+   "203.0.113.7"
+  ],
+  "present": [
+   "429"
+  ]
+ },
+ {
+  "in": "ENOENT: no such file or directory, open '/home/alice/project/.env'",
+  "absent": [
+   "alice"
+  ],
+  "present": [
+   "ENOENT",
+   "/home/",
+   "project/.env"
+  ]
+ },
+ {
+  "in": "aws: InvalidClientTokenId AKIAIOSFODNN7EXAMPLE",
+  "absent": [
+   "AKIAIOSFODNN7EXAMPLE"
+  ],
+  "present": [
+   "InvalidClientTokenId"
+  ]
+ },
+ {
+  "in": "config error: api_key=abcd1234efgh password: \"s3cr3t-value\"",
+  "absent": [
+   "abcd1234efgh",
+   "s3cr3t-value"
+  ],
+  "present": [
+   "config error"
+  ]
+ },
+ {
+  "in": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASC\n-----END PRIVATE KEY----- failed to sign",
+  "absent": [
+   "MIIEvQIBADANBgkqhkiG9w0BAQEFAASC"
+  ],
+  "present": [
+   "failed to sign"
+  ]
+ },
+ {
+  "in": "Error: oauth token expired",
+  "absent": [],
+  "present": [
+   "oauth token expired"
+  ]
+ },
+ {
+  "in": "MCP error -32601: Method not found",
+  "absent": [],
+  "present": [
+   "MCP error -32601: Method not found"
+  ]
+ },
+ {
+  "in": "Authentication error [code: 10000]",
+  "absent": [],
+  "present": [
+   "Authentication error [code: 10000]"
+  ]
+ },
+ {
+  "in": "model: claude-sonnet-4-5-20250929 is deprecated, see https://docs.anthropic.com/en/docs/about-claude/model-deprecations",
+  "absent": [],
+  "present": [
+   "claude-sonnet-4-5-20250929",
+   "https://docs.anthropic.com/en/docs/about-claude/model-deprecations"
+  ]
+ },
+ {
+  "in": "invalid key 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08 rejected",
+  "absent": [
+   "9f86d081884c7d659a2feaa0c55ad015"
+  ],
+  "present": [
+   "invalid key",
+   "rejected"
+  ]
+ },
+ {
+  "in": "secret: Zm9vYmFyYmF6cXV4MTIzNDU2Nzg5MEFCQ0RFRkdISUpLTE1OT1A= in header",
+  "absent": [
+   "Zm9vYmFyYmF6cXV4MTIzNDU2Nzg5MEFCQ0RFRkdISUpLTE1OT1A"
+  ],
+  "present": [
+   "in header"
+  ]
+ }
+]
