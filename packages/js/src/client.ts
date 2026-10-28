@@ -1,6 +1,6 @@
 import { redactSecrets } from './redact.js';
 
-export const VERSION = '0.2.0';
+export const VERSION = '0.3.0';
 export const DEFAULT_BASE_URL = 'https://breakwire.org';
 
 type FetchLike = (input: string, init?: any) => Promise<any>;
@@ -37,6 +37,12 @@ export interface LookupOptions {
    * close). The error-path helpers (withBreakwire, breakwireFetch, explain, installBreakwire) default to true.
    */
   noLog?: boolean;
+  /** Short, token-cheap answer (server compact mode). */
+  compact?: boolean;
+  /** Return at most this many matches (1-10). */
+  maxMatches?: number;
+  /** Drop matches whose confidence_score is below this (0-1). */
+  minScore?: number;
 }
 
 export interface Verification { status: string; reports: number; independent_operators: number; [k: string]: unknown }
@@ -65,10 +71,15 @@ export interface StackInput {
 export interface SubscribeOptions {
   /** Alert this many days ahead of a deadline (1-180, default 30). */
   horizonDays?: number;
+  /** Opt in to new-model launch alerts: true (the stack's services) or a list of service slugs. */
+  launches?: boolean | string[];
   /** Optional https webhook. It must answer the signed verify POST (2xx, body containing the challenge). */
   webhookUrl?: string;
 }
-export type Outcome = 'fixed' | 'not_fixed' | 'confirmed' | 'disputed';
+/** Lookup outcomes (close a lookup id) and claim outcomes (report on a claim id). */
+export type LookupOutcome = 'fixed' | 'partial' | 'applies' | 'not_fixed' | 'wrong_match' | 'not_covered' | 'solved';
+export type Outcome = LookupOutcome | 'confirmed' | 'disputed';
+export const LOOKUP_OUTCOMES: readonly LookupOutcome[] = ['fixed', 'partial', 'applies', 'not_fixed', 'wrong_match', 'not_covered', 'solved'];
 export interface ReportEnv { sdk?: string; sdk_version?: string; model?: string; runtime?: string; tested_at?: string; [k: string]: string | undefined }
 
 export class BreakwireError extends Error {
@@ -165,6 +176,9 @@ export class Breakwire {
     if (opts.crossService) body.cross_service = true;
     if (opts.logMiss === false) body.log_miss = false;
     if (opts.noLog) body.no_log = true;
+    if (opts.compact) body.compact = true;
+    if (opts.maxMatches) body.max_matches = Math.max(1, Math.min(10, Math.floor(opts.maxMatches)));
+    if (opts.minScore != null) body.min_score = Math.max(0, Math.min(1, opts.minScore));
     return this.request<LookupResult>('POST', '/api/lookup', body);
   }
 
@@ -190,21 +204,44 @@ export class Breakwire {
    * - target "AN-YYYY-NNNN" (a claim id): files an outcome report on the claim; needs an apiKey.
    */
   report(target: string, outcome: Outcome, env: ReportEnv = {}, opts: { cid?: string; note?: string; statementIndex?: number } = {}): Promise<any> {
-    const positive = outcome === 'fixed' || outcome === 'confirmed';
-    if (!['fixed', 'not_fixed', 'confirmed', 'disputed'].includes(outcome)) return Promise.reject(new TypeError('breakwire: outcome must be fixed|not_fixed|confirmed|disputed'));
     const cleanEnv: Record<string, string> = {};
     for (const [k, v] of Object.entries(env)) if (v != null) cleanEnv[k] = this.redact(v).slice(0, 200);
     const note = opts.note ? this.redact(opts.note).slice(0, 2000) : undefined;
     if (target.startsWith('lk_')) {
-      return this.request('POST', `/api/lookups/${encodeURIComponent(target)}/outcome`, { cid: opts.cid, outcome: positive ? 'fixed' : 'not_fixed', note, env: cleanEnv }, true);
+      // every lookup outcome the server accepts; confirmed/disputed map to fixed/not_fixed for backwards compatibility
+      const o = outcome === 'confirmed' ? 'fixed' : outcome === 'disputed' ? 'not_fixed' : outcome;
+      if (!(LOOKUP_OUTCOMES as readonly string[]).includes(o)) return Promise.reject(new TypeError(`breakwire: lookup outcome must be ${LOOKUP_OUTCOMES.join('|')}`));
+      if (o === 'solved' && !note) return Promise.reject(new TypeError('breakwire: outcome "solved" needs opts.note (what fixed it)'));
+      const cid = o === 'not_covered' || o === 'solved' ? undefined : opts.cid;
+      return this.request('POST', `/api/lookups/${encodeURIComponent(target)}/outcome`, { cid, outcome: o, note, env: cleanEnv }, true);
     }
     if (/^AN-\d{4}-\d{4,}$/.test(target)) {
+      const positive = outcome === 'fixed' || outcome === 'confirmed';
+      if (!['fixed', 'not_fixed', 'confirmed', 'disputed'].includes(outcome)) return Promise.reject(new TypeError('breakwire: a claim report outcome must be fixed|not_fixed|confirmed|disputed'));
       if (!this.apiKey) return Promise.reject(new TypeError('breakwire: reporting on a claim needs an apiKey (or report on the lookup id instead)'));
       if (!positive && !note) return Promise.reject(new TypeError('breakwire: a disputed report needs opts.note'));
       return this.request('POST', `/api/claims/${target}/reports`, { outcome: positive ? 'confirmed' : 'disputed', env: cleanEnv, note, statement_index: opts.statementIndex }, true);
     }
     return Promise.reject(new TypeError(`breakwire: report target must be a lookup id (lk_...) or claim id (AN-...): ${target}`));
   }
+
+  /** New model launches (official vendor sources only), newest first. since: YYYY-MM-DD or "30d". */
+  async launches(opts: { since?: string; services?: string[] } = {}): Promise<any> {
+    const q = new URLSearchParams();
+    if (opts.since) q.set('since', opts.since);
+    if (opts.services?.length) q.set('services', opts.services.join(','));
+    return this.request<any>('GET', `/api/launches${q.toString() ? '?' + q.toString() : ''}`);
+  }
+
+  /** What changed since a date (claims, model launches, revisions). Call with your training cutoff after deploys/upgrades. */
+  changes(from: string, opts: { to?: string; service?: string; kind?: string } = {}): Promise<any> {
+    const q = new URLSearchParams({ from });
+    if (opts.to) q.set('to', opts.to);
+    if (opts.service) q.set('service', opts.service);
+    if (opts.kind) q.set('kind', opts.kind);
+    return this.request<any>('GET', `/api/changes?${q.toString()}`);
+  }
+
 
   /** package.json fields, raw files or ["name@version", ...] -> applicable deadlines, advisories and breaking changes.
    * An empty stack returns 200 with { empty: true, hint }. */
@@ -221,6 +258,7 @@ export class Breakwire {
     const body: Record<string, unknown> = { ...input };
     if (opts.horizonDays) body.horizon_days = opts.horizonDays;
     if (opts.webhookUrl) body.webhook_url = opts.webhookUrl;
+    if (opts.launches) body.launches = opts.launches;
     return this.request('POST', '/api/subscriptions', body);
   }
 

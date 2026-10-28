@@ -1,0 +1,7 @@
+{
+  "name": "breakwire",
+  "owner": { "name": "Breakwire", "url": "https://breakwire.org" },
+  "plugins": [
+    { "name": "breakwire", "source": "./plugins/claude-code/breakwire", "description": "Check Breakwire first on unfamiliar errors, model ids / SDK versions in code, and deploys or upgrades." }
+  ]
+}

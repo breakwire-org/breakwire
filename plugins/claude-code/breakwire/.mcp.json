@@ -1,0 +1,5 @@
+{
+  "mcpServers": {
+    "breakwire": { "type": "http", "url": "https://breakwire.org/mcp" }
+  }
+}

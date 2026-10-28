@@ -17,7 +17,7 @@ for lookups and reads.
      }
    }
    ```
-2. Save. The server should connect and list 14 tools, including `lookup_error`, `deadlines` and `check_stack`.
+2. Save. The server should connect and list 20 tools, including `lookup_error`, `search_error` (read-only), `changes`, `model_launches` and `check_stack`.
 3. Test: call `list_services` (no arguments), then `lookup_error` with
    `{"error": "tool_choice: type \"tool\" and \"any\" are not supported for this model.", "service": "anthropic-api"}`.
    Expect a match `AN-2026-0025` with `confidence: "signature"`.

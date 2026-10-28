@@ -200,7 +200,7 @@ test('CommonJS build loads', () => {
 });
 
 // ---- 0.2.0: error-path defaults, cache, subscriptions, webhook verification ----
-test('version is 0.2.0', () => { assert.equal(VERSION, '0.2.0'); });
+test('version is 0.3.0', () => { assert.equal(VERSION, '0.3.0'); });
 
 test('explain(): no-log by default, opt out with noLog:false', async () => {
   clearBreakwireCache();
@@ -254,4 +254,35 @@ test('verifyWebhookSignature matches the server scheme and rejects tampering/sta
   const old = t - 1000, sigOld = createHmac('sha256', secret).update(`${old}.${body}`).digest('hex');
   assert.equal(await verifyWebhookSignature(secret, `t=${old},v1=${sigOld}`, body), false);
   assert.equal(await verifyWebhookSignature(secret, null, body), false);
+});
+
+// ---- 0.3.0 parity ----
+test('0.3.0: report() sends every lookup outcome; solved needs a note; not_covered drops cid', async () => {
+  const f = mockFetch(() => ({ body: { ok: true } }));
+  const bw = new Breakwire({ fetch: f });
+  for (const o of ['fixed', 'partial', 'applies', 'not_fixed', 'wrong_match', 'not_covered']) await bw.report('lk_abc', o, {}, { cid: 'AN-2026-0025' });
+  assert.deepEqual(f.calls.map((c) => c.body.outcome), ['fixed', 'partial', 'applies', 'not_fixed', 'wrong_match', 'not_covered']);
+  assert.equal(f.calls[5].body.cid, undefined);
+  await assert.rejects(bw.report('lk_abc', 'solved'), /needs opts.note/);
+  await bw.report('lk_abc', 'solved', {}, { note: 'pinned the SDK' });
+  assert.equal(f.calls.at(-1).body.outcome, 'solved');
+  await bw.report('lk_abc', 'confirmed');
+  assert.equal(f.calls.at(-1).body.outcome, 'fixed');
+  await assert.rejects(bw.report('lk_abc', 'bogus'), /lookup outcome must be/);
+});
+test('0.3.0: lookup sends compact, max_matches, min_score', async () => {
+  const f = mockFetch(() => ({ body: LOOKUP }));
+  await new Breakwire({ fetch: f }).lookup('x error', { compact: true, maxMatches: 40, minScore: 0.5, noLog: true });
+  const b = f.calls[0].body;
+  assert.equal(b.compact, true); assert.equal(b.max_matches, 10); assert.equal(b.min_score, 0.5); assert.equal(b.no_log, true);
+});
+test('0.3.0: launches(), changes() and subscribe({launches})', async () => {
+  const f = mockFetch(() => ({ body: { launches: [], changes: [] } }));
+  const bw = new Breakwire({ fetch: f });
+  await bw.launches({ since: '30d', services: ['openai-api', 'gemini-api'] });
+  await bw.changes('2026-06-01', { service: 'openai-api' });
+  await bw.subscribe({ services: ['openai-api'] }, { launches: true });
+  assert.match(f.calls[0].url, /\/api\/launches\?since=30d&services=openai-api%2Cgemini-api$/);
+  assert.match(f.calls[1].url, /\/api\/changes\?from=2026-06-01&service=openai-api$/);
+  assert.equal(f.calls[2].body.launches, true);
 });

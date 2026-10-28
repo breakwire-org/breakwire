@@ -296,9 +296,27 @@ class T(unittest.TestCase):
         self.assertEqual(orig.breakwire.id, "AN-2026-0025")
         self.assertEqual(o2.breakwire.id, "AN-2026-0025")
 
+    # ---- 0.3.0 parity ----
+    def test_report_all_lookup_outcomes(self):
+        c = bw()
+        for o in ("fixed", "partial", "applies", "not_fixed", "wrong_match", "not_covered"):
+            c.report("lk_abc", o, cid="AN-2026-0025")
+        outs = [x["body"]["outcome"] for x in S.calls if x["path"].endswith("/outcome")]
+        self.assertEqual(outs, ["fixed", "partial", "applies", "not_fixed", "wrong_match", "not_covered"])
+        self.assertNotIn("cid", [x for x in S.calls if x["path"].endswith("/outcome")][-1]["body"])
+        with self.assertRaises(ValueError):
+            c.report("lk_abc", "solved")
+        with self.assertRaises(ValueError):
+            c.report("lk_abc", "bogus")
+
+    def test_lookup_compact_max_min(self):
+        bw().lookup("x error", compact=True, max_matches=40, min_score=0.5, no_log=True)
+        b = [x for x in S.calls if x["path"] == "/api/lookup"][-1]["body"]
+        self.assertEqual((b["compact"], b["max_matches"], b["min_score"], b["no_log"]), (True, 10, 0.5, True))
+
     # ---- 0.2.0 ----
     def test_version(self):
-        self.assertEqual(__version__, "0.2.0")
+        self.assertEqual(__version__, "0.3.0")
 
     def test_explain_no_log_default_and_cache(self):
         clear_cache()

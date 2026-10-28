@@ -14,8 +14,8 @@ from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel, ConfigDict, Field
 
-__version__ = "0.2.0"
-__all__ = ["BreakwireLookupTool", "BreakwireDeadlinesTool", "BreakwireStackTool", "BreakwireCallbackHandler",
+__version__ = "0.3.0"
+__all__ = ["BreakwireLookupTool", "BreakwireReportTool", "BreakwireChangesTool", "BreakwireDeadlinesTool", "BreakwireStackTool", "BreakwireCallbackHandler",
            "breakwire_tools", "__version__"]
 
 
@@ -50,17 +50,21 @@ class BreakwireLookupTool(BaseTool):
     name: str = "breakwire_lookup_error"
     description: str = (
         "Look up an API/SDK/platform error message in Breakwire, a source-linked registry of breaking changes, "
-        "deprecations and advisories. Returns the matching claim and its fix. Use when a call fails with an error you do not recognise."
+        "deprecations and advisories. Returns the matching claim and its fix. Use when a call fails with an error you do not recognise. "
+        "Fail open: if Breakwire is unavailable you get {\"error\": ...}; continue debugging normally."
     )
     args_schema: Type[BaseModel] = _LookupInput
     client: Breakwire = Field(default_factory=Breakwire)
     log_miss: bool = False
+    no_log: bool = False
     max_matches: int = 3
+    min_score: Optional[float] = None
 
     def _run(self, error: str, service: Optional[str] = None, sdk: Optional[str] = None,
              sdk_version: Optional[str] = None, model: Optional[str] = None, run_manager: Any = None) -> Dict[str, Any]:
         try:
-            r = self.client.lookup(error, service=service, sdk=sdk, version=sdk_version, model=model, log_miss=self.log_miss)
+            r = self.client.lookup(error, service=service, sdk=sdk, version=sdk_version, model=model, log_miss=self.log_miss,
+                                   no_log=self.no_log, max_matches=self.max_matches, min_score=self.min_score)
             return _compact(r, self.max_matches)
         except Exception as e:  # noqa: BLE001
             return {"error": f"Breakwire unavailable: {e}"}
@@ -122,10 +126,65 @@ class BreakwireStackTool(BaseTool):
             return {"error": f"Breakwire unavailable: {e}"}
 
 
+class _ReportInput(BaseModel):
+    lookup_id: str = Field(description="lookup_id returned by breakwire_lookup_error")
+    outcome: str = Field(description="fixed | partial | applies | not_fixed | wrong_match | not_covered | solved")
+    cid: Optional[str] = Field(default=None, description="Which returned claim (omit for not_covered / solved)")
+    note: Optional[str] = Field(default=None, description="Required for solved: what fixed it")
+
+
+class BreakwireReportTool(BaseTool):
+    """Close a lookup: say whether the suggested fix worked (one call, after you tried it)."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    name: str = "breakwire_close_lookup"
+    description: str = (
+        "After trying a fix from breakwire_lookup_error, report the outcome once: fixed, partial, applies, not_fixed, "
+        "wrong_match, not_covered (nothing returned explained it) or solved (you fixed it yourself; note required)."
+    )
+    args_schema: Type[BaseModel] = _ReportInput
+    client: Breakwire = Field(default_factory=Breakwire)
+
+    def _run(self, lookup_id: str, outcome: str, cid: Optional[str] = None, note: Optional[str] = None, run_manager: Any = None) -> Any:
+        try:
+            return self.client.report(lookup_id, outcome, cid=cid, note=note)
+        except Exception as e:  # noqa: BLE001
+            return {"error": f"Breakwire unavailable or rejected the report: {e}"}
+
+
+class _ChangesInput(BaseModel):
+    from_date: str = Field(description="YYYY-MM-DD, e.g. your training cutoff")
+    service: Optional[str] = Field(default=None, description="Service slug; omit for all")
+
+
+class BreakwireChangesTool(BaseTool):
+    """What changed since a date: breaking changes, deprecations, new model launches."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    name: str = "breakwire_changes"
+    description: str = (
+        "What changed for an API/SDK since a date (use your training cutoff): claims by event date and new model launches, "
+        "each with its primary source. Call before deploys or upgrades, or when code names a model id or SDK version."
+    )
+    args_schema: Type[BaseModel] = _ChangesInput
+    client: Breakwire = Field(default_factory=Breakwire)
+    max_items: int = 15
+
+    def _run(self, from_date: str, service: Optional[str] = None, run_manager: Any = None) -> Any:
+        try:
+            r = self.client.changes(from_date, service=service)
+            return {"changes": [{"id": c.get("cid"), "date": c.get("date"), "kind": c.get("kind"), "title": c.get("title"), "source_url": c.get("source_url")}
+                                for c in (r.get("changes") or [])[: self.max_items]],
+                    "launches": [{"id": x.get("cid"), "date": x.get("date"), "models": x.get("models"), "source_url": x.get("source_url")} for x in (r.get("launches") or [])[: self.max_items]],
+                    "total": len(r.get("changes") or [])}
+        except Exception as e:  # noqa: BLE001
+            return {"error": f"Breakwire unavailable: {e}"}
+
+
 def breakwire_tools(client: Optional[Breakwire] = None) -> List[BaseTool]:
-    """The three Breakwire tools sharing one client: lookup_error, deadlines, check_stack."""
+    """The Breakwire tools sharing one client: lookup_error, close_lookup, changes, deadlines, check_stack."""
     c = client or Breakwire()
-    return [BreakwireLookupTool(client=c), BreakwireDeadlinesTool(client=c), BreakwireStackTool(client=c)]
+    return [BreakwireLookupTool(client=c), BreakwireReportTool(client=c), BreakwireChangesTool(client=c), BreakwireDeadlinesTool(client=c), BreakwireStackTool(client=c)]
 
 
 class BreakwireCallbackHandler(BaseCallbackHandler):

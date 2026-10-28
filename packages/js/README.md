@@ -144,3 +144,17 @@ reports yet, and the site says so on every claim instead of calling it verified.
 prefer the linked source.
 
 MIT. API docs: https://breakwire.org/llms.txt · OpenAPI: https://breakwire.org/openapi.json · MCP: https://breakwire.org/mcp
+
+## 0.3.0
+
+```ts
+const bw = new Breakwire();
+const r = await bw.lookup(err, { service: 'openai-api', compact: true, maxMatches: 3, minScore: 0.5, noLog: true });
+await bw.report(r.lookup_id, 'partial', {}, { cid: r.matches[0]?.cid });   // fixed | partial | applies | not_fixed | wrong_match | not_covered | solved
+await bw.changes('2025-06-01', { service: 'openai-api' });                // step one after a deploy/upgrade: what changed since your cutoff
+await bw.launches({ since: '30d', services: ['anthropic-api'] });        // new models (official vendor sources only)
+await bw.subscribe({ services: ['openai-api'] }, { launches: true });    // opt-in new-model alerts
+```
+
+Fail open: the wrappers (`withBreakwire`, `breakwireFetch`, `explain`) never throw; if Breakwire is slow or down, your
+error passes through unchanged. Direct client calls reject with `BreakwireError`; catch it and carry on.

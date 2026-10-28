@@ -11,7 +11,8 @@ from typing import Any, Dict, Iterable, List, Optional, Union
 
 from ._redact import redact_secrets
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
+LOOKUP_OUTCOMES = ("fixed", "partial", "applies", "not_fixed", "wrong_match", "not_covered", "solved")
 DEFAULT_BASE_URL = "https://breakwire.org"
 _CID = re.compile(r"^AN-\d{4}-\d{4,}$")
 _SUB = re.compile(r"^sub_[A-Za-z0-9_-]{20,40}$")
@@ -132,10 +133,13 @@ class Breakwire:
 
     def lookup(self, error: Any, service: Optional[str] = None, sdk: Optional[str] = None, version: Optional[str] = None,
                model: Optional[str] = None, http_status: Optional[int] = None, context: Optional[str] = None,
-               cross_service: bool = False, log_miss: bool = True, no_log: bool = False) -> Dict[str, Any]:
+               cross_service: bool = False, log_miss: bool = True, no_log: bool = False, compact: bool = False,
+               max_matches: Optional[int] = None, min_score: Optional[float] = None) -> Dict[str, Any]:
         """Match an error (exception or text) against documented signatures and claims. Redacted before sending.
 
         no_log=True: the server answers but stores nothing about this lookup (the error-path helpers default to it).
+        compact=True: short, token-cheap answer. max_matches (1-10) and min_score (0-1) trim the matches server-side.
+        Fail open: if Breakwire is slow or down this raises BreakwireError; the error-path helpers never raise.
         """
         body: Dict[str, Any] = {"error": self.redact(error_text(error))}
         if service:
@@ -157,6 +161,12 @@ class Breakwire:
             body["log_miss"] = False
         if no_log:
             body["no_log"] = True
+        if compact:
+            body["compact"] = True
+        if max_matches:
+            body["max_matches"] = max(1, min(10, int(max_matches)))
+        if min_score is not None:
+            body["min_score"] = max(0.0, min(1.0, float(min_score)))
         return self.request("POST", "/api/lookup", body)
 
     def deadlines(self, service: Optional[str] = None, kind: Optional[str] = None, limit: Optional[int] = None) -> List[Dict[str, Any]]:
@@ -175,23 +185,29 @@ class Breakwire:
                note: Optional[str] = None, statement_index: Optional[int] = None) -> Dict[str, Any]:
         """Say whether a fix worked. Only after you applied it and saw the result.
 
-        target "lk_..." closes a lookup (anonymous unless api_key is set; cid picks the match).
-        target "AN-YYYY-NNNN" files an outcome report on a claim (needs api_key).
-        outcome: fixed | not_fixed | confirmed | disputed.
+        target "lk_..." closes a lookup (anonymous unless api_key is set; cid picks the match). Outcomes:
+        fixed | partial | applies | not_fixed | wrong_match | not_covered | solved (solved needs note).
+        confirmed/disputed are accepted as aliases of fixed/not_fixed.
+        target "AN-YYYY-NNNN" files an outcome report on a claim (needs api_key): fixed | not_fixed | confirmed | disputed.
         """
-        if outcome not in ("fixed", "not_fixed", "confirmed", "disputed"):
-            raise ValueError("outcome must be fixed|not_fixed|confirmed|disputed")
-        positive = outcome in ("fixed", "confirmed")
         clean_env = {k: self.redact(v)[:200] for k, v in (env or {}).items() if v is not None}
         clean_note = self.redact(note)[:2000] if note else None
         if target.startswith("lk_"):
-            body = {"outcome": "fixed" if positive else "not_fixed", "env": clean_env}
-            if cid:
+            o = {"confirmed": "fixed", "disputed": "not_fixed"}.get(outcome, outcome)
+            if o not in LOOKUP_OUTCOMES:
+                raise ValueError("lookup outcome must be " + "|".join(LOOKUP_OUTCOMES))
+            if o == "solved" and not clean_note:
+                raise ValueError('outcome "solved" needs note (what fixed it)')
+            body: Dict[str, Any] = {"outcome": o, "env": clean_env}
+            if cid and o not in ("not_covered", "solved"):
                 body["cid"] = cid
             if clean_note:
                 body["note"] = clean_note
             return self.request("POST", f"/api/lookups/{urllib.parse.quote(target)}/outcome", body, auth=True)
         if _CID.match(target):
+            if outcome not in ("fixed", "not_fixed", "confirmed", "disputed"):
+                raise ValueError("a claim report outcome must be fixed|not_fixed|confirmed|disputed")
+            positive = outcome in ("fixed", "confirmed")
             if not self.api_key:
                 raise ValueError("reporting on a claim needs api_key (or report on the lookup id instead)")
             if not positive and not clean_note:
@@ -203,6 +219,16 @@ class Breakwire:
                 body["statement_index"] = statement_index
             return self.request("POST", f"/api/claims/{target}/reports", body, auth=True)
         raise ValueError(f"report target must be a lookup id (lk_...) or claim id (AN-...): {target!r}")
+
+    def launches(self, since: Optional[str] = None, services: Optional[List[str]] = None) -> Dict[str, Any]:
+        """New model launches (official vendor sources only), newest first. since: YYYY-MM-DD or "30d"."""
+        q = {k: v for k, v in (("since", since), ("services", ",".join(services) if services else None)) if v}
+        return self.request("GET", "/api/launches" + ("?" + urllib.parse.urlencode(q) if q else ""))
+
+    def changes(self, from_date: str, to: Optional[str] = None, service: Optional[str] = None, kind: Optional[str] = None) -> Dict[str, Any]:
+        """What changed since a date (claims, model launches, revisions). Call with your training cutoff after deploys/upgrades."""
+        q = {k: v for k, v in (("from", from_date), ("to", to), ("service", service), ("kind", kind)) if v}
+        return self.request("GET", "/api/changes?" + urllib.parse.urlencode(q))
 
     def stack(self, dependencies: Optional[Dict[str, str]] = None, dev_dependencies: Optional[Dict[str, str]] = None,
               engines: Optional[Dict[str, str]] = None, packages: Optional[List[str]] = None,
@@ -226,7 +252,8 @@ class Breakwire:
                 continue
         return out
 
-    def subscribe(self, horizon_days: Optional[int] = None, webhook_url: Optional[str] = None, **stack: Any) -> Dict[str, Any]:
+    def subscribe(self, horizon_days: Optional[int] = None, webhook_url: Optional[str] = None,
+                  launches: Optional[Union[bool, List[str]]] = None, **stack: Any) -> Dict[str, Any]:
         """Register a stack once; get alerts when a deadline or breaking change that affects it comes up.
 
         Same stack arguments as stack(). Returns id, manage_token (shown once: store it), feed {json, atom, rss},
@@ -239,6 +266,8 @@ class Breakwire:
             body["horizon_days"] = int(horizon_days)
         if webhook_url:
             body["webhook_url"] = webhook_url
+        if launches:
+            body["launches"] = launches
         return self.request("POST", "/api/subscriptions", body)
 
     def alerts(self, subscription_id: str) -> Dict[str, Any]:

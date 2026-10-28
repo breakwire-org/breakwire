@@ -1,6 +1,6 @@
 # Directory and framework entries (copy-paste ready)
 
-Checked against each directory's current rules on 2026-10-28. Order and accounts are in [../LAUNCH.md](../LAUNCH.md).
+Checked against each directory's current rules on 2026-10-28. Order and accounts are tracked privately by the operator (not in this repo).
 Common facts used everywhere:
 
 | Field | Value |
@@ -20,7 +20,7 @@ Common facts used everywhere:
 ---
 
 ## 1. Official MCP Registry (do first; Glama, PulseMCP, GitHub/VS Code MCP list ingest from it)
-Files: [../mcp/server.json](../mcp/server.json) (validated with `mcp-publisher validate`), script [../mcp/registry-dns.sh](../mcp/registry-dns.sh). Steps in LAUNCH.md §2.
+Files: [../mcp/server.json](../mcp/server.json) (validated with `mcp-publisher validate`), script [../mcp/registry-dns.sh](../mcp/registry-dns.sh). Publish with `mcp-publisher login dns` then `mcp-publisher publish mcp/server.json`.
 
 ## 2. Glama (glama.ai/mcp/connectors)
 No submission needed after the registry publish: Glama ingests registry servers and creates
@@ -88,7 +88,7 @@ Issue form: https://github.com/cline/mcp-marketplace/issues/new?template=mcp-ser
 - Logo: upload `assets/logo-400.png` (400×400 PNG, required)
 - Reason for addition:
   `Cline users hit API, SDK and MCP errors caused by upstream changes (model retirements, deprecated parameters, SDK breaking releases). Breakwire's lookup_error tool returns the source-linked change and fix for the error text, and check_stack lists deadlines for a project's dependencies. Remote Streamable HTTP, no key needed for lookups; setup for Cline (type "streamableHttp") is in mcp/CLIENTS.md and llms-install.md in the repo.`
-- Checkbox "tested installation with Cline using README/llms-install.md": only tick after actually testing (see LAUNCH.md §7).
+- Checkbox "tested installation with Cline using README/llms-install.md": only tick after actually testing.
 Cline vets for adoption/credibility; a brand-new project may be deferred. That's expected; resubmit later.
 
 ## 8. Docker MCP Catalog (docker/mcp-registry)
@@ -113,7 +113,7 @@ Skipped (shutting down 2026-10-31).
 
 ## Vercel AI SDK: Tools Registry (accepts community PRs)
 Repo `vercel/ai`, file `content/tools-registry/registry.ts`, guide `contributing/add-new-tool-to-registry.md`.
-Prerequisite: `breakwire` published on npm (LAUNCH.md §4) and the docs anchor live.
+Prerequisite: `breakwire` published on npm and the docs anchor live.
 Append [vercel-ai-tools-registry.entry.ts](vercel-ai-tools-registry.entry.ts) as the last element of the `tools` array
 (after `agentmail`; the array is not alphabetical). The code example was run with the AI SDK 7 mock model against the live
 API: the tool returned AN-2026-0025 with `explained: true`.
@@ -123,7 +123,7 @@ PR body: `Adds Breakwire (npm: breakwire, subpath breakwire/ai-sdk) to the tools
 ## LangChain (issue, not PR)
 Rule (langchain-ai/docs CONTRIBUTING + integrations page): "Do not submit integration PRs to the LangChain or Deep Agents
 repositories." Publish a standalone package, then open an **Integration listing** issue; manual listing PRs are auto-closed.
-Prerequisite: `langchain-breakwire` on PyPI (LAUNCH.md §5).
+Prerequisite: `langchain-breakwire` on PyPI.
 Issue: https://github.com/langchain-ai/docs/issues/new?template=06-integration-submission.yml
 - Integration display name: `Breakwire`
 - Language: `Python`

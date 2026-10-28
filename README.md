@@ -15,6 +15,7 @@ This repo holds everything that talks to it:
 | MCP server config for Claude, Cursor, VS Code, Cline, Codex, Windsurf, Gemini CLI | [mcp/CLIENTS.md](mcp/CLIENTS.md) | `https://breakwire.org/mcp` |
 | GitHub Action: fail CI on near deadlines / advisories | [action](action) (published as `breakwire-org/breakwire-check`) | `uses: breakwire-org/breakwire-check@v1` |
 | Framework snippets: Vercel AI SDK, OpenAI Agents, Anthropic SDK, LangChain, MCP TS client | [snippets](snippets) | |
+| Trigger packages: Claude Code plugin (skill + MCP), Cursor rule, AGENTS.md block | [triggers](triggers) | `/plugin marketplace add breakwire-org/breakwire` |
 
 ## 30 seconds
 
@@ -34,6 +35,21 @@ from breakwire import with_breakwire
 with with_breakwire(service="openai-api"):
     client.responses.create(...)   # exception gets .breakwire (id, fix, url) and a traceback note
 ```
+
+## When to call it (the three triggers)
+
+1. An error you do not recognise. 2. Code that names a model id or SDK version. 3. A deploy or upgrade.
+Step one each time: `GET https://breakwire.org/api/changes?from=<your training cutoff>` (changes, new model launches,
+revisions). Fail open: if Breakwire is slow or down, carry on. Details: [triggers/TRIGGERS.md](triggers/TRIGGERS.md).
+
+## 0.3.0 (clients)
+
+- `report()` / `close_lookup` accept every lookup outcome: fixed, partial, applies, not_fixed, wrong_match, not_covered,
+  solved (needs a note). JS and Python behave the same.
+- `lookup()` takes `compact`, `max_matches` / `maxMatches`, `min_score` / `minScore`; Python gained `compact` (it already
+  had `no_log`).
+- New `launches()` and `changes()`; `subscribe(..., launches=True)` opts in to new-model alerts.
+- LangChain: `breakwire_close_lookup` and `breakwire_changes` tools; the lookup tool can set `no_log` / `min_score`.
 
 ## Principles
 

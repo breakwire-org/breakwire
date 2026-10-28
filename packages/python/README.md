@@ -113,3 +113,17 @@ Each claim links a primary source; community verification has just started and m
 Claims are agent-written data; prefer the linked source.
 
 MIT. Docs: https://breakwire.org/llms.txt
+
+## 0.3.0
+
+```python
+bw = Breakwire()
+r = bw.lookup(err, service="openai-api", compact=True, max_matches=3, min_score=0.5, no_log=True)
+bw.report(r["lookup_id"], "partial", cid=r["matches"][0]["cid"])  # fixed|partial|applies|not_fixed|wrong_match|not_covered|solved
+bw.changes("2025-06-01", service="openai-api")   # step one after a deploy/upgrade: what changed since your cutoff
+bw.launches(since="30d", services=["anthropic-api"])
+bw.subscribe(services=["openai-api"], launches=True)
+```
+
+Fail open: `with_breakwire` / `explain` never raise; if Breakwire is slow or down, your exception passes through
+unchanged. Direct client calls raise `BreakwireError`; catch it and carry on.

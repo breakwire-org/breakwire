@@ -34,3 +34,9 @@ Built on the stdlib-only [`breakwire`](https://pypi.org/project/breakwire/) clie
 Breakwire's community verification has just started; claims link primary sources, prefer those.
 
 MIT.
+
+## 0.3.0
+
+`breakwire_tools()` now returns five tools: `breakwire_lookup_error`, `breakwire_close_lookup` (every outcome),
+`breakwire_changes` (what changed since a date, with new model launches), `breakwire_deadlines`, `breakwire_check_stack`.
+All tools fail open: if Breakwire is unavailable they return `{"error": ...}` instead of raising.
