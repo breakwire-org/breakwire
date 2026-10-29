@@ -1,7 +1,7 @@
 # breakwire (Python)
 
 <!-- versions:begin (generated from versions.json by scripts/versions.mjs; do not edit) -->
-**Current release:** clients **0.6.0** (npm `breakwire`, PyPI `breakwire`, PyPI `langchain-breakwire`) · server **0.8.0** · GitHub Action `breakwire-check` **1.1.1** · [CHANGELOG](https://github.com/breakwire-org/breakwire/blob/main/CHANGELOG.md)
+**Current release:** clients **0.6.0** (npm `breakwire`, PyPI `breakwire`, PyPI `langchain-breakwire`) · server **0.9.0** · GitHub Action `breakwire-check` **1.2.0** · [CHANGELOG](https://github.com/breakwire-org/breakwire/blob/main/CHANGELOG.md)
 <!-- versions:end -->
 
 Look up an API, SDK or platform error and get the source-linked breaking change, deprecation or advisory that explains

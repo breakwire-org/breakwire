@@ -3,6 +3,28 @@
 Client packages: npm `breakwire`, PyPI `breakwire`, PyPI `langchain-breakwire` (released together). Versions are
 managed in [versions.json](versions.json).
 
+## 1.2.0 (Action `breakwire-check`) and server 0.9.0, 2026-10-29
+
+### Action 1.2.0
+
+- **Security: redirects.** Before 1.2.0 the Action re-sent its stack POST body to any redirect `Location`. It now
+  follows only https redirects to the base URL's origin or breakwire.org (http only for a same-origin localhost base
+  URL), at most 3 hops, and keeps method and body only on 307/308. Tests: `action/test/redirect.test.js`.
+- **Fewer false blocks.** A deadline matched only by service name is a warning by default; failing needs a
+  package/version, runtime or model match (`deadline-policy: specific`, `any` restores the old behavior).
+  New `models` input: multi-model lifecycle claims use the named model's own date and state.
+
+### Server 0.9.0 (breakwire.org; contract additions the clients may want to expose)
+
+- `POST /api/stack`: `installed` ({pkg: version}), `models`, `strict`, `compact`, `include_related`; items carry
+  `match.applicability` (affected / not_affected / possibly_affected / unknown), `bucket` (exactly_applies / may_apply /
+  context_only), `resources`; top-level `buckets`, `needs_installed_versions`.
+- `POST /api/lookup`: `lifecycle_context`, `not_applicable`, `diagnostic_fork`, `persistence`, per-match `citation`
+  (immutable /claim/X/v/N), `equivalent`; compact output omits reflex/remember unless asked; no gap URL on a no_log miss.
+- Outcome reports: `evidence_type`, `intervention`, `verification`; only remedy_tested / production_recovered count as
+  fix evidence. Claims: `dates` and per-resource `resources`. `GET /lookup?error=` in HTML no longer runs a lookup.
+- MCP Registry entry `org.breakwire/breakwire` 0.9.0.
+
 ## 0.6.0 (clients), 2026-10-28
 
 Security and correctness release from an outside review. Behavior changes, hence a minor bump.

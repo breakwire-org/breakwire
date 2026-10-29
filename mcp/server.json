@@ -3,7 +3,7 @@
   "name": "org.breakwire/breakwire",
   "title": "Breakwire",
   "description": "Look up an API/SDK error; get the source-linked breaking change, deprecation or advisory and fix.",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "websiteUrl": "https://breakwire.org",
   "remotes": [
     {
