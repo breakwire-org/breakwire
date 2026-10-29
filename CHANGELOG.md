@@ -57,6 +57,11 @@ Security and correctness release from an outside review. Behavior changes, hence
 - `stack()` / `subscribe()` with files no longer upload the files (see above).
 - `langchain-breakwire` requires `breakwire>=0.6.0`; its stack tool inherits local parsing.
 
+### Known issues
+
+- JS `verifyWebhookSignature` needs a global WebCrypto (`globalThis.crypto.subtle`): Node 19+, Workers, Deno, Bun.
+  On Node 18 (EOL) it returns `false`; this predates 0.6.0. CI tests Node 20/22/24.
+
 ## 0.5.0 (clients)
 
 - Channel tag `X-Breakwire-Client` (`breakwire-js/<version>`, `breakwire-py/<version>`, `langchain-breakwire/<version>`)

@@ -82,14 +82,27 @@ function daysUntil(dateStr, today) {
 }
 
 // claims: /api/stack applicable[]; returns flagged list with level fail|warn
-function evaluate(claims, { days = 30, onDeadline = 'fail', onAdvisory = 'warn', today = new Date().toISOString().slice(0, 10) } = {}) {
+// v1.2.0: a deadline blocks only when it is tied to something you actually use: a package/version, runtime or model match
+// (match.by package|runtime|model, or bucket exactly_applies/may_apply). A claim matched by service name alone (e.g. a model
+// retirement found because you depend on that vendor's SDK) is an advisory warning unless deadline-policy is "any".
+function matchBasis(c) {
+  if (!c.match) return 'legacy';
+  if (['package', 'runtime', 'model'].includes(c.match.by) || c.bucket === 'exactly_applies' || c.bucket === 'may_apply') return c.match.by || c.bucket;
+  return 'service-only';
+}
+function evaluate(claims, { days = 30, onDeadline = 'fail', onAdvisory = 'warn', deadlinePolicy = 'specific', today = new Date().toISOString().slice(0, 10) } = {}) {
   const flagged = [];
   for (const c of claims || []) {
     if (c.verification && c.verification.status === 'refuted') continue;
     if (c.applies === 'no') continue;
-    if (c.deadline && onDeadline !== 'ignore') {
-      const n = daysUntil(c.deadline, today);
-      if (n >= 0 && n <= days) { flagged.push({ ...c, reason: 'deadline', days_left: n, level: onDeadline }); continue; }
+    const due = (c.next_deadline && c.next_deadline.date) || c.deadline;
+    if (due && onDeadline !== 'ignore') {
+      const n = daysUntil(due, today);
+      if (n >= 0 && n <= days) {
+        const basis = matchBasis(c), specific = basis !== 'service-only' || deadlinePolicy === 'any';
+        flagged.push({ ...c, reason: 'deadline', due, days_left: n, match_basis: basis, level: specific ? onDeadline : (onDeadline === 'fail' ? 'warn' : onDeadline) });
+        continue;
+      }
     }
     // Advisories fail only when a pinned/locked version is inside an affected range; otherwise they warn.
     if (c.kind === 'advisory' && onAdvisory !== 'ignore') flagged.push({ ...c, reason: 'advisory', level: c.applies === 'yes' ? onAdvisory : (onAdvisory === 'fail' ? 'warn' : onAdvisory) });
@@ -153,4 +166,4 @@ function lockVersions(lockText) {
   try { const j = JSON.parse(lockText); const out = {}; for (const [k, v] of Object.entries(j.packages || {})) { const m = k.match(/^node_modules\/((?:@[^/]+\/)?[^/]+)$/); if (m && v && v.version) out[m[1]] = v.version; } for (const [k, v] of Object.entries(j.dependencies || {})) if (!out[k] && v && v.version) out[k] = v.version; return out; } catch { return {}; }
 }
 
-module.exports = { applies, inRange, cmpVersion, parseAffected, exactVersion, lockVersions, norm, parsePackageJson, parseRequirements, parsePyproject, pep508ToPackage, packagesForApi, evaluate, daysUntil };
+module.exports = { matchBasis, applies, inRange, cmpVersion, parseAffected, exactVersion, lockVersions, norm, parsePackageJson, parseRequirements, parsePyproject, pep508ToPackage, packagesForApi, evaluate, daysUntil };
