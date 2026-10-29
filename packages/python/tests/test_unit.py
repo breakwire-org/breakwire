@@ -100,6 +100,7 @@ class T(unittest.TestCase):
         self.assertEqual((c["method"], c["path"]), ("POST", "/api/lookup"))
         self.assertTrue(c["headers"]["User-Agent"].startswith("breakwire-python/"))
         self.assertNotIn("Python-urllib", c["headers"]["User-Agent"])
+        self.assertTrue({k.lower(): v for k, v in c["headers"].items()}["x-breakwire-client"].startswith("breakwire-py/"))
         self.assertNotIn("AbCdEfGh", json.dumps(c["body"]))
         self.assertEqual({k: v for k, v in c["body"].items() if k != "error"},
                          {"service": "anthropic-api", "sdk": "anthropic-python", "sdk_version": "0.60.0", "http_status": 401, "log_miss": False})
@@ -316,7 +317,7 @@ class T(unittest.TestCase):
 
     # ---- 0.2.0 ----
     def test_version(self):
-        self.assertEqual(__version__, "0.4.0")
+        self.assertEqual(__version__, "0.5.0")
 
     def test_explain_no_log_default_and_cache(self):
         clear_cache()

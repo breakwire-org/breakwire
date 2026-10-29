@@ -1,5 +1,11 @@
 {
   "servers": {
-    "breakwire": { "type": "http", "url": "https://breakwire.org/mcp" }
+    "breakwire": {
+      "type": "http",
+      "url": "https://breakwire.org/mcp",
+      "headers": {
+        "X-Breakwire-Client": "kit/vscode"
+      }
+    }
   }
 }

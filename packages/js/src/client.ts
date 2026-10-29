@@ -1,6 +1,6 @@
 import { redactSecrets } from './redact.js';
 
-export const VERSION = '0.4.0';
+export const VERSION = '0.5.0';
 export const DEFAULT_BASE_URL = 'https://breakwire.org';
 
 type FetchLike = (input: string, init?: any) => Promise<any>;
@@ -14,6 +14,11 @@ export interface BreakwireOptions {
   apiKey?: string;
   /** Appended to the User-Agent, e.g. "my-agent/1.2". */
   userAgent?: string;
+  /**
+   * Channel tag sent as X-Breakwire-Client (server 0.8.0 counts lookups per client surface in /api/stats "channels";
+   * aggregate counts only). Default "breakwire-js/<version>". Integrations set their own, e.g. "kit/cursor".
+   */
+  channel?: string;
   /** Custom fetch (tests, proxies). Defaults to globalThis.fetch. */
   fetch?: FetchLike;
   /** Extra literal strings or patterns to strip before sending (e.g. your own tokens). */
@@ -132,13 +137,14 @@ function httpStatusOf(err: unknown): number | undefined {
 
 export class Breakwire {
   readonly baseUrl: string; readonly timeoutMs: number;
-  private apiKey?: string; private ua: string; private f: FetchLike; private secrets: Array<string | RegExp>;
+  private apiKey?: string; private ua: string; readonly channel: string; private f: FetchLike; private secrets: Array<string | RegExp>;
 
   constructor(opts: BreakwireOptions = {}) {
     this.baseUrl = (opts.baseUrl || envVar('BREAKWIRE_BASE_URL') || DEFAULT_BASE_URL).replace(/\/+$/, '');
     this.timeoutMs = opts.timeoutMs ?? 3000;
     this.apiKey = opts.apiKey || envVar('BREAKWIRE_API_KEY');
     this.ua = `breakwire-js/${VERSION}${opts.userAgent ? ' ' + opts.userAgent : ''}`;
+    this.channel = String(opts.channel || envVar('BREAKWIRE_CLIENT') || `breakwire-js/${VERSION}`).replace(/[^\x21-\x7e]/g, '').slice(0, 80) || `breakwire-js/${VERSION}`;
     const f = opts.fetch || (globalThis as any).fetch;
     if (!f) throw new Error('breakwire: no fetch available (Node 18+, Workers, Deno, Bun and browsers have one; or pass options.fetch)');
     this.f = f.bind ? f.bind(globalThis) : f;
@@ -149,7 +155,7 @@ export class Breakwire {
   redact(text: unknown): string { return redactSecrets(text, this.secrets); }
 
   async request<T = any>(method: string, path: string, body?: unknown, auth = false, bearer?: string): Promise<T> {
-    const headers: Record<string, string> = { accept: 'application/json', 'user-agent': this.ua };
+    const headers: Record<string, string> = { accept: 'application/json', 'user-agent': this.ua, 'x-breakwire-client': this.channel };
     if (body !== undefined) headers['content-type'] = 'application/json';
     if (auth && this.apiKey) headers.authorization = `Bearer ${this.apiKey}`;
     if (bearer) headers.authorization = `Bearer ${bearer}`;

@@ -145,6 +145,10 @@ prefer the linked source.
 
 MIT. API docs: https://breakwire.org/llms.txt · OpenAPI: https://breakwire.org/openapi.json · MCP: https://breakwire.org/mcp
 
+## 0.5.0
+
+Sends `X-Breakwire-Client: breakwire-js/<version>` so Breakwire 0.8.0 can count lookups per client surface (aggregate counts only, no IPs). Integrations can override it with `new Breakwire({ channel: 'kit/cursor' })` or `$BREAKWIRE_CLIENT`.
+
 ## 0.4.0
 
 `lookup(err, { since, reflex })` sends `since` (YYYY-MM-DD) and `reflex: false`; new `gap(id)` reads a gap ticket. `LookupResult` types `cite`, `reflex`, `please` and `miss`.

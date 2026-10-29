@@ -57,6 +57,7 @@ test('lookup sends redacted error, maps options, sets User-Agent', async () => {
   assert.equal(c.url, 'https://x.test/api/lookup');
   assert.equal(c.method, 'POST');
   assert.match(c.headers['user-agent'], /^breakwire-js\/\d+\.\d+\.\d+ my-agent\/1$/);
+  assert.match(c.headers['x-breakwire-client'], /^breakwire-js\/\d+\.\d+\.\d+$/, 'channel tag header');
   assert.ok(!JSON.stringify(c.body).includes('AbCdEfGh'));
   assert.deepEqual({ ...c.body, error: undefined }, { error: undefined, service: 'anthropic-api', sdk: 'anthropic-typescript', sdk_version: '0.60.0', http_status: 401, log_miss: false });
   assert.equal(c.headers.authorization, undefined, 'no auth header on lookups');
@@ -200,7 +201,7 @@ test('CommonJS build loads', () => {
 });
 
 // ---- 0.2.0: error-path defaults, cache, subscriptions, webhook verification ----
-test('version is 0.4.0', () => { assert.equal(VERSION, '0.4.0'); });
+test('version is 0.5.0', () => { assert.equal(VERSION, '0.5.0'); });
 
 test('explain(): no-log by default, opt out with noLog:false', async () => {
   clearBreakwireCache();
@@ -285,4 +286,10 @@ test('0.4.0: launches(), changes() and subscribe({launches})', async () => {
   assert.match(f.calls[0].url, /\/api\/launches\?since=30d&services=openai-api%2Cgemini-api$/);
   assert.match(f.calls[1].url, /\/api\/changes\?from=2026-06-01&service=openai-api$/);
   assert.equal(f.calls[2].body.launches, true);
+});
+
+test('channel option overrides the channel tag (X-Breakwire-Client)', async () => {
+  const f = mockFetch(() => ({ body: LOOKUP }));
+  await new Breakwire({ baseUrl: 'https://x.test', fetch: f, channel: 'kit/cursor' }).lookup('boom error text', { logMiss: false });
+  assert.equal(f.calls[0].headers['x-breakwire-client'], 'kit/cursor');
 });

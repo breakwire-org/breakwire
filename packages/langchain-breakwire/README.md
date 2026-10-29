@@ -35,6 +35,10 @@ Breakwire's community verification has just started; claims link primary sources
 
 MIT.
 
+## 0.5.0
+
+The default client sends `X-Breakwire-Client: langchain-breakwire/<version>` (aggregate per-channel counts on Breakwire 0.8.0). Requires `breakwire>=0.5.0`.
+
 ## 0.4.0
 
 The lookup tool's compact result now includes `cite`, `please` and `miss` (gap id, coverage note, nearest claims). Requires `breakwire>=0.4.0`.

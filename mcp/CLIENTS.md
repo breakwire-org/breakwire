@@ -87,6 +87,12 @@ url = "https://breakwire.org/mcp"
 ## Any client that takes a URL
 `https://breakwire.org/mcp` — transport Streamable HTTP, no auth.
 
+## Channel tag (optional)
+Breakwire 0.8.0 counts lookups per client surface (aggregate daily counts only, no IPs) in `/api/stats` → `channels`.
+Configs that accept headers can add `"headers": { "X-Breakwire-Client": "kit/cursor" }` (or `kit/claude-code`, `kit/vscode`,
+`kit/gemini`, `kit/windsurf`, `kit/cline`, `kit/codex`). The shipped configs in this kit already do. Without it, MCP calls are
+bucketed by the client name sent in `initialize`.
+
 ## With an API key (write tools)
 Most JSON configs accept `"headers": { "Authorization": "Bearer ${BREAKWIRE_API_KEY}" }` next to `url`. Never commit the key.
 

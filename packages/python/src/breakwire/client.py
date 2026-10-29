@@ -11,7 +11,7 @@ from typing import Any, Dict, Iterable, List, Optional, Union
 
 from ._redact import redact_secrets
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 LOOKUP_OUTCOMES = ("fixed", "partial", "applies", "not_fixed", "wrong_match", "not_covered", "solved")
 DEFAULT_BASE_URL = "https://breakwire.org"
 _CID = re.compile(r"^AN-\d{4}-\d{4,}$")
@@ -87,13 +87,18 @@ class Breakwire:
     """
 
     def __init__(self, base_url: Optional[str] = None, timeout: float = 3.0, api_key: Optional[str] = None,
-                 user_agent: Optional[str] = None, secrets: Optional[Iterable[Union[str, "re.Pattern[str]"]]] = None):
+                 user_agent: Optional[str] = None, secrets: Optional[Iterable[Union[str, "re.Pattern[str]"]]] = None,
+                 channel: Optional[str] = None):
         self.base_url = (base_url or os.environ.get("BREAKWIRE_BASE_URL") or DEFAULT_BASE_URL).rstrip("/")
         self.timeout = timeout
         self.api_key = api_key or os.environ.get("BREAKWIRE_API_KEY")
         # Explicit UA: Cloudflare's edge answers 403 to Python-urllib's default User-Agent.
         self.user_agent = f"breakwire-python/{__version__}" + (f" {user_agent}" if user_agent else "")
         self.secrets = list(secrets or [])
+        # Channel tag (X-Breakwire-Client): server 0.8.0 counts lookups per client surface in /api/stats "channels"
+        # (aggregate counts only). Integrations pass their own, e.g. channel="kit/cursor".
+        ch = channel or os.environ.get("BREAKWIRE_CLIENT") or f"breakwire-py/{__version__}"
+        self.channel = "".join(c for c in str(ch) if 0x21 <= ord(c) <= 0x7e)[:80] or f"breakwire-py/{__version__}"
 
     def redact(self, text: Any) -> str:
         return redact_secrets(text, self.secrets)
@@ -101,7 +106,7 @@ class Breakwire:
     def request(self, method: str, path: str, body: Any = None, auth: bool = False, bearer: Optional[str] = None) -> Any:
         url = self.base_url + path
         data = None if body is None else json.dumps(body).encode()
-        headers = {"accept": "application/json", "user-agent": self.user_agent}
+        headers = {"accept": "application/json", "user-agent": self.user_agent, "x-breakwire-client": self.channel}
         if data is not None:
             headers["content-type"] = "application/json"
         if auth and self.api_key:

@@ -1,5 +1,10 @@
 {
   "mcpServers": {
-    "breakwire": { "url": "https://breakwire.org/mcp" }
+    "breakwire": {
+      "url": "https://breakwire.org/mcp",
+      "headers": {
+        "X-Breakwire-Client": "kit/cursor"
+      }
+    }
   }
 }

@@ -14,7 +14,7 @@ from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel, ConfigDict, Field
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 __all__ = ["BreakwireLookupTool", "BreakwireReportTool", "BreakwireChangesTool", "BreakwireDeadlinesTool", "BreakwireStackTool", "BreakwireCallbackHandler",
            "breakwire_tools", "__version__"]
 
@@ -195,7 +195,7 @@ class BreakwireChangesTool(BaseTool):
 
 def breakwire_tools(client: Optional[Breakwire] = None) -> List[BaseTool]:
     """The Breakwire tools sharing one client: lookup_error, close_lookup, changes, deadlines, check_stack."""
-    c = client or Breakwire()
+    c = client or Breakwire(user_agent=f"langchain-breakwire/{__version__}", channel=f"langchain-breakwire/{__version__}")
     return [BreakwireLookupTool(client=c), BreakwireReportTool(client=c), BreakwireChangesTool(client=c), BreakwireDeadlinesTool(client=c), BreakwireStackTool(client=c)]
 
 
@@ -211,7 +211,7 @@ class BreakwireCallbackHandler(BaseCallbackHandler):
 
     def __init__(self, service: Optional[str] = None, client: Optional[Breakwire] = None, timeout: float = 2.5,
                  log_miss: bool = True, on_match: Optional[Any] = None, no_log: bool = True, **lookup: Any):
-        self.client = client or Breakwire(timeout=timeout)
+        self.client = client or Breakwire(timeout=timeout, user_agent=f"langchain-breakwire/{__version__}", channel=f"langchain-breakwire/{__version__}")
         self.timeout = timeout
         self.lookup = {"service": service, "log_miss": log_miss, "no_log": no_log, **lookup}
         self.on_match = on_match

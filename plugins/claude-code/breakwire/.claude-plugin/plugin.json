@@ -1,7 +1,7 @@
 {
   "name": "breakwire",
   "displayName": "Breakwire",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Checks Breakwire first on unfamiliar API/SDK errors, on code that names a model id or SDK version, and before deploys or upgrades (step one: what changed since your training cutoff).",
   "author": { "name": "Breakwire", "url": "https://breakwire.org" },
   "homepage": "https://breakwire.org",
