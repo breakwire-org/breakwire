@@ -1,0 +1,156 @@
+[
+ {
+  "js": {
+   "service": "anthropic-api"
+  },
+  "py": {
+   "service": "anthropic-api"
+  },
+  "wire": {
+   "service": "anthropic-api"
+  }
+ },
+ {
+  "js": {
+   "sdk": "openai-node"
+  },
+  "py": {
+   "sdk": "openai-node"
+  },
+  "wire": {
+   "sdk": "openai-node"
+  }
+ },
+ {
+  "js": {
+   "version": "0.60.0"
+  },
+  "py": {
+   "version": "0.60.0"
+  },
+  "wire": {
+   "sdk_version": "0.60.0"
+  }
+ },
+ {
+  "js": {
+   "model": "claude-x"
+  },
+  "py": {
+   "model": "claude-x"
+  },
+  "wire": {
+   "model": "claude-x"
+  }
+ },
+ {
+  "js": {
+   "httpStatus": 429
+  },
+  "py": {
+   "http_status": 429
+  },
+  "wire": {
+   "http_status": 429
+  }
+ },
+ {
+  "js": {
+   "context": "calling messages.create"
+  },
+  "py": {
+   "context": "calling messages.create"
+  },
+  "wire": {
+   "context": "calling messages.create"
+  }
+ },
+ {
+  "js": {
+   "crossService": true
+  },
+  "py": {
+   "cross_service": true
+  },
+  "wire": {
+   "cross_service": true
+  }
+ },
+ {
+  "js": {
+   "logMiss": false
+  },
+  "py": {
+   "log_miss": false
+  },
+  "wire": {
+   "log_miss": false
+  }
+ },
+ {
+  "js": {
+   "noLog": true
+  },
+  "py": {
+   "no_log": true
+  },
+  "wire": {
+   "no_log": true
+  }
+ },
+ {
+  "js": {
+   "compact": true
+  },
+  "py": {
+   "compact": true
+  },
+  "wire": {
+   "compact": true
+  }
+ },
+ {
+  "js": {
+   "maxMatches": 2
+  },
+  "py": {
+   "max_matches": 2
+  },
+  "wire": {
+   "max_matches": 2
+  }
+ },
+ {
+  "js": {
+   "minScore": 0.5
+  },
+  "py": {
+   "min_score": 0.5
+  },
+  "wire": {
+   "min_score": 0.5
+  }
+ },
+ {
+  "js": {
+   "since": "2026-01-01"
+  },
+  "py": {
+   "since": "2026-01-01"
+  },
+  "wire": {
+   "since": "2026-01-01"
+  }
+ },
+ {
+  "js": {
+   "reflex": false
+  },
+  "py": {
+   "reflex": false
+  },
+  "wire": {
+   "reflex": false
+  }
+ }
+]

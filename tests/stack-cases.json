@@ -1,0 +1,242 @@
+[
+ {
+  "name": "package.json: only dependency facts; scripts, repository, name and file/git/workspace deps stay home",
+  "input": {
+   "files": {
+    "package.json": "{\"name\": \"@acme/secret-billing\", \"private\": true, \"repository\": \"git+ssh://git@github.internal/acme/billing.git\", \"scripts\": {\"deploy\": \"curl -H 'Authorization: Bearer sk-live-abcdef' https://deploy.internal\"}, \"dependencies\": {\"next\": \"^16.0.1\", \"@modelcontextprotocol/sdk\": \"1.9.0\", \"internal-lib\": \"file:../internal-lib\", \"forked\": \"github:acme/forked#main\", \"git-dep\": \"git+https://token123@github.com/acme/x.git\", \"ws-dep\": \"workspace:*\"}, \"devDependencies\": {\"typescript\": \"5.9.3\", \"wrangler\": \"4.87.0\"}, \"engines\": {\"node\": \">=20\"}}"
+   }
+  },
+  "expect": {
+   "dependencies": {
+    "@modelcontextprotocol/sdk": "1.9.0",
+    "next": "^16.0.1"
+   },
+   "devDependencies": {
+    "typescript": "5.9.3",
+    "wrangler": "4.87.0"
+   },
+   "engines": {
+    "node": ">=20"
+   }
+  },
+  "absent": [
+   "secret-billing",
+   "deploy.internal",
+   "sk-live",
+   "internal-lib",
+   "forked",
+   "token123",
+   "workspace"
+  ]
+ },
+ {
+  "name": "package-lock.json v3: top-level registry packages with exact versions",
+  "input": {
+   "files": {
+    "package-lock.json": "{\"lockfileVersion\": 3, \"packages\": {\"\": {\"name\": \"@acme/secret-billing\"}, \"node_modules/next\": {\"version\": \"16.0.1\", \"resolved\": \"https://registry.npmjs.org/next/-/next-16.0.1.tgz\"}, \"node_modules/@modelcontextprotocol/sdk\": {\"version\": \"1.9.0\"}, \"node_modules/next/node_modules/semver\": {\"version\": \"7.0.0\"}, \"node_modules/internal-lib\": {\"version\": \"1.0.0\", \"resolved\": \"file:../internal-lib\", \"link\": true}, \"packages/app\": {\"version\": \"0.0.1\"}}}"
+   }
+  },
+  "expect": {
+   "packages": [
+    "npm:@modelcontextprotocol/sdk@1.9.0",
+    "npm:next@16.0.1"
+   ]
+  },
+  "absent": [
+   "secret-billing",
+   "internal-lib",
+   "semver",
+   "packages/app"
+  ]
+ },
+ {
+  "name": "requirements.txt: options, index URLs with credentials, editable/local/URL refs, hashes and markers dropped",
+  "input": {
+   "files": {
+    "requirements.txt": "# private index with credentials\n--index-url https://user:pa55@pypi.acme.internal/simple\n-e ./local-pkg\nmcp==1.9.0 --hash=sha256:abcdef\nAnthropic[bedrock] >= 0.60, <1 ; python_version >= \"3.9\"\nprivate-thing @ git+https://token@github.com/acme/private-thing.git\nrequests\n./wheels/acme-1.0.whl\n"
+   }
+  },
+  "expect": {
+   "requirements": "anthropic>=0.60,<1\nmcp==1.9.0\nrequests"
+  },
+  "absent": [
+   "pa55",
+   "acme.internal",
+   "local-pkg",
+   "private-thing",
+   "token",
+   "sha256",
+   "wheels"
+  ]
+ },
+ {
+  "name": "pyproject.toml: PEP 621 + optional + poetry deps; path deps, project name and URLs dropped",
+  "input": {
+   "files": {
+    "pyproject.toml": "[project]\nname = \"acme-secret-service\"\nversion = \"1.0.0\"\ndependencies = [\n  \"openai>=1.40\",  # comment\n  \"langchain-core==0.3.10\",\n]\n[project.optional-dependencies]\ndev = [\"pytest>=8\"]\n[project.urls]\nRepository = \"https://github.internal/acme/secret\"\n[tool.poetry.dependencies]\npython = \"^3.11\"\ngoogle-genai = \"^1.2.0\"\nacme-internal = { path = \"../acme-internal\" }\nhttpx = { version = \"~0.27\", extras = [\"http2\"] }\n"
+   }
+  },
+  "expect": {
+   "requirements": "google-genai>=1.2.0\nhttpx>=0.27\nlangchain-core==0.3.10\nopenai>=1.40\npytest>=8"
+  },
+  "absent": [
+   "acme-secret-service",
+   "github.internal",
+   "acme-internal"
+  ]
+ },
+ {
+  "name": "poetry.lock and uv.lock: exact pypi versions; git and editable sources dropped",
+  "input": {
+   "files": {
+    "poetry.lock": "[[package]]\nname = \"mcp\"\nversion = \"1.9.0\"\n\n[[package]]\nname = \"acme-private\"\nversion = \"0.1.0\"\n\n[package.source]\ntype = \"git\"\nurl = \"https://github.internal/acme/private.git\"\n\n[[package]]\nname = \"Pydantic_Core\"\nversion = \"2.23.4\"\n",
+    "sub/uv.lock": "[[package]]\nname = \"acme-secret-service\"\nversion = \"1.0.0\"\nsource = { editable = \".\" }\n\n[[package]]\nname = \"anthropic\"\nversion = \"0.60.0\"\nsource = { registry = \"https://pypi.org/simple\" }\n"
+   }
+  },
+  "expect": {
+   "packages": [
+    "pypi:anthropic==0.60.0",
+    "pypi:mcp==1.9.0",
+    "pypi:pydantic-core==2.23.4"
+   ]
+  },
+  "absent": [
+   "acme-private",
+   "acme-secret-service",
+   "github.internal"
+  ]
+ },
+ {
+  "name": "yarn.lock: registry packages; file: entries dropped",
+  "input": {
+   "files": {
+    "yarn.lock": "# yarn lockfile v1\n\n\"@anthropic-ai/sdk@^0.60.0\":\n  version \"0.60.0\"\n  resolved \"https://registry.yarnpkg.com/@anthropic-ai/sdk/-/sdk-0.60.0.tgz\"\n\nzod@^3.23.0, zod@^3.24.0:\n  version \"3.24.1\"\n\n\"internal@file:../internal\":\n  version \"1.0.0\"\n"
+   }
+  },
+  "expect": {
+   "packages": [
+    "npm:@anthropic-ai/sdk@0.60.0",
+    "npm:zod@3.24.1"
+   ]
+  },
+  "absent": [
+   "internal@"
+  ]
+ },
+ {
+  "name": "workflow YAML: only third-party action refs; secrets, run steps, local and docker actions dropped",
+  "input": {
+   "files": {
+    ".github/workflows/ci.yml": "name: ci\nenv:\n  TOKEN: ${{ secrets.DEPLOY_TOKEN }}\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-node@v3\n        with: { node-version: 20 }\n      - uses: ./.github/actions/internal\n      - uses: docker://alpine:3.19\n      - run: curl -H \"Authorization: Bearer $TOKEN\" https://deploy.internal\n      - uses: \"cloudflare/wrangler-action@v3.4.1\"\n"
+   }
+  },
+  "expect": {
+   "workflows": [
+    "uses: actions/checkout@v4\nuses: actions/setup-node@v3\nuses: cloudflare/wrangler-action@v3.4.1"
+   ]
+  },
+  "absent": [
+   "DEPLOY_TOKEN",
+   "deploy.internal",
+   "internal",
+   "alpine"
+  ]
+ },
+ {
+  "name": "runtime files: .nvmrc, .python-version, vercel.json, netlify.toml",
+  "input": {
+   "files": {
+    ".nvmrc": "v20.11.1\n",
+    ".python-version": "3.12.4\n",
+    "vercel.json": "{\"functions\":{\"api/*.js\":{\"runtime\":\"nodejs18.x\"}},\"env\":{\"SECRET\":\"x\"}}"
+   }
+  },
+  "expect": {
+   "runtime": {
+    "node": "20",
+    "python": "3.12"
+   }
+  },
+  "absent": [
+   "SECRET"
+  ]
+ },
+ {
+  "name": "structured fields pass through cleaned; unknown files are ignored",
+  "input": {
+   "packages": [
+    "next@16.0.1",
+    "pypi:mcp==1.9.0"
+   ],
+   "services": [
+    "stripe-api"
+   ],
+   "runtime": {
+    "node": "20"
+   },
+   "files": {
+    ".env": "OPENAI_API_KEY=sk-proj-abcdefghijklmnop",
+    "README.md": "secret plans"
+   }
+  },
+  "expect": {
+   "packages": [
+    "next@16.0.1",
+    "pypi:mcp==1.9.0"
+   ],
+   "services": [
+    "stripe-api"
+   ],
+   "runtime": {
+    "node": "20"
+   }
+  },
+  "absent": [
+   "sk-proj",
+   "secret plans"
+  ],
+  "ignored": [
+   ".env",
+   "README.md"
+  ]
+ },
+ {
+  "name": "raw text fields (requirements, workflows, nvmrc) are parsed too",
+  "input": {
+   "requirements": "mcp==1.9.0\n--extra-index-url https://u:p@x.internal/simple\n",
+   "workflows": [
+    "name: ci\nenv:\n  TOKEN: ${{ secrets.DEPLOY_TOKEN }}\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-node@v3\n        with: { node-version: 20 }\n      - uses: ./.github/actions/internal\n      - uses: docker://alpine:3.19\n      - run: curl -H \"Authorization: Bearer $TOKEN\" https://deploy.internal\n      - uses: \"cloudflare/wrangler-action@v3.4.1\"\n"
+   ],
+   "nvmrc": "22"
+  },
+  "expect": {
+   "requirements": "mcp==1.9.0",
+   "workflows": [
+    "uses: actions/checkout@v4\nuses: actions/setup-node@v3\nuses: cloudflare/wrangler-action@v3.4.1"
+   ],
+   "runtime": {
+    "node": "22"
+   }
+  },
+  "absent": [
+   "x.internal",
+   "DEPLOY_TOKEN"
+  ]
+ },
+ {
+  "name": "files as a list of {path, content}",
+  "input": {
+   "files": [
+    {
+     "path": "app/package.json",
+     "content": "{\"dependencies\":{\"ai\":\"7.0.155\"}}"
+    }
+   ]
+  },
+  "expect": {
+   "dependencies": {
+    "ai": "7.0.155"
+   }
+  }
+ }
+]

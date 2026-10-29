@@ -1,6 +1,6 @@
 {
   "name": "breakwire",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Client for Breakwire: look up an API/SDK error and get the source-linked breaking change, deprecation or advisory that explains it, with the fix. Zero runtime dependencies; Node 18+, Cloudflare Workers, Deno, Bun. Optional Vercel AI SDK tools.",
   "keywords": [
     "breaking-changes",
@@ -64,7 +64,7 @@
   },
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.json && tsc -p tsconfig.cjs.json && echo '{\"type\":\"commonjs\"}' > dist/cjs/package.json",
-    "test": "npm run build && node --test test/unit.test.mjs",
+    "test": "npm run build && node --test test/unit.test.mjs test/v060.test.mjs",
     "test:live": "npm run build && node test/live.mjs",
     "prepublishOnly": "npm test"
   },

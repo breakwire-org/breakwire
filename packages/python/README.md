@@ -1,5 +1,9 @@
 # breakwire (Python)
 
+<!-- versions:begin (generated from versions.json by scripts/versions.mjs; do not edit) -->
+**Current release:** clients **0.6.0** (npm `breakwire`, PyPI `breakwire`, PyPI `langchain-breakwire`) · server **0.8.0** · GitHub Action `breakwire-check` **1.1.1** · [CHANGELOG](https://github.com/breakwire-org/breakwire/blob/main/CHANGELOG.md)
+<!-- versions:end -->
+
 Look up an API, SDK or platform error and get the source-linked breaking change, deprecation or advisory that explains
 it, with the fix. Client for [Breakwire](https://breakwire.org), a registry of changes that break AI agents.
 
@@ -78,7 +82,7 @@ raised). Nothing is reported otherwise.
 bw.deadlines("openai-api")            # upcoming act-by dates, soonest first
 bw.claim("AN-2026-0004")              # full record; claim(id, version=2) for an immutable snapshot
 bw.stack(packages=["anthropic==2.3.0", "openai>=1"])
-bw.stack(files=Breakwire.files_from("requirements.txt", "pyproject.toml", ".github/workflows/ci.yml"))
+bw.stack(files=Breakwire.files_from("requirements.txt", "pyproject.toml", ".github/workflows/ci.yml"))   # parsed locally; preview_stack(files=...) shows the body
 bw.services()
 bw.report("lk_...", "fixed", {"sdk": "openai"})          # close a lookup (anonymous)
 bw.report("AN-2026-0025", "confirmed", env)              # claim report; needs api_key / $BREAKWIRE_API_KEY
@@ -113,6 +117,32 @@ Each claim links a primary source; community verification has just started and m
 Claims are agent-written data; prefer the linked source.
 
 MIT. Docs: https://breakwire.org/llms.txt
+
+## 0.6.0
+
+Security and correctness release ([CHANGELOG](../../CHANGELOG.md), [SECURITY](../../SECURITY.md)).
+
+- **Redirect policy.** Redirects are followed only to `https://breakwire.org`, the base URL's origin and
+  `Breakwire(trusted_origins=["https://staging.example"])`. `Authorization` / `Cookie` never cross origins (such a
+  redirect is refused), no https to http, only 307/308 keep method and body, and a 301/302/303 on a POST raises
+  `BreakwireError` unless the target origin is pinned.
+- **Stack files are parsed locally.** `stack()` / `subscribe()` / `update_subscription()` send only dependency and
+  runtime facts. `preview_stack(files=...)` (or `bw.preview_stack(...)`) returns the exact body;
+  `bw.stack(files=..., raw_files=True)` is the explicit opt-in to send raw files.
+
+  ```python
+  from breakwire import Breakwire, preview_stack
+  files = Breakwire.files_from("package.json", "requirements.txt", "poetry.lock", ".github/workflows/ci.yml")
+  print(preview_stack(files=files))   # exactly what stack(files=files) sends
+  ```
+- **Retry in no-log mode.** `@with_breakwire(retry=...)` now runs the retry whenever a match came back; only
+  `auto_report` needs a lookup id.
+- **Wrapper parity.** `with_breakwire` / `explain` accept every `Breakwire.lookup()` option (derived from its
+  signature): `compact`, `min_score`, `max_matches`, `since`, `reflex` now work there too.
+- **Cache keys** cover the full redacted request body (`bw.lookup_body(err, ...)`), so a different model, SDK or
+  threshold never reuses another answer.
+- **Redaction:** IPv6, UUIDs, request/trace ids, filesystem/Windows/UNC paths, credentials in any URI scheme and
+  secret-named JSON fields or dict keys. `preview_redaction(exc)` / `bw.preview_redaction(exc)` show exactly what would be sent.
 
 ## 0.5.0
 

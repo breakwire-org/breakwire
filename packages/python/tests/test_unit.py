@@ -106,11 +106,17 @@ class T(unittest.TestCase):
                          {"service": "anthropic-api", "sdk": "anthropic-python", "sdk_version": "0.60.0", "http_status": 401, "log_miss": False})
         self.assertNotIn("Authorization", c["headers"])
 
-    def test_post_resent_across_301(self):
+    def test_post_301_same_unpinned_origin_is_refused(self):
+        # 0.6.0: a 301 on a POST would drop the body; only pinned origins get the same request re-sent
+        # (full policy in tests/test_v060.py and tests/redirect-cases.json).
         b = Breakwire(base_url=S.url + "/old")
-        self.assertEqual(b.lookup("some error text")["lookup_id"], "lk_abc123")
-        self.assertEqual([(c["method"], c["path"]) for c in S.calls], [("POST", "/old/api/lookup"), ("POST", "/api/lookup")])
-        self.assertEqual(S.calls[1]["body"]["error"], "some error text")
+        with self.assertRaises(BreakwireError) as cm:
+            b.lookup("some error text")
+        self.assertIn("refused 301", str(cm.exception))
+        self.assertEqual([(c["method"], c["path"]) for c in S.calls], [("POST", "/old/api/lookup")])
+        b2 = Breakwire(base_url=S.url + "/old", trusted_origins=[S.url])
+        self.assertEqual(b2.lookup("some error text")["lookup_id"], "lk_abc123")
+        self.assertEqual(S.calls[-1]["body"]["error"], "some error text")
 
     def test_routes(self):
         b = bw()
@@ -317,7 +323,9 @@ class T(unittest.TestCase):
 
     # ---- 0.2.0 ----
     def test_version(self):
-        self.assertEqual(__version__, "0.5.0")
+        import re as _re
+        pyproject = (pathlib.Path(__file__).resolve().parents[1] / "pyproject.toml").read_text()
+        self.assertEqual(__version__, _re.search(r'^version = "([^"]+)"', pyproject, _re.M).group(1))
 
     def test_explain_no_log_default_and_cache(self):
         clear_cache()
@@ -345,7 +353,7 @@ class T(unittest.TestCase):
         B.subscribe(files={"requirements.txt": "mcp==1.9.0\n"}, horizon_days=14)
         c = S.calls[-1]
         self.assertEqual((c["method"], c["path"]), ("POST", "/api/subscriptions"))
-        self.assertEqual(c["body"], {"files": {"requirements.txt": "mcp==1.9.0\n"}, "horizon_days": 14})
+        self.assertEqual(c["body"], {"requirements": "mcp==1.9.0", "horizon_days": 14})  # parsed locally (0.6.0)
         sid = "sub_" + "a" * 24
         B.alerts(sid)
         self.assertEqual(S.calls[-1]["path"], f"/api/subscriptions/{sid}/feed")

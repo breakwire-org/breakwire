@@ -1,6 +1,7 @@
 import { redactSecrets } from './redact.js';
+import { normalizeStack } from './stack.js';
 
-export const VERSION = '0.5.0';
+export const VERSION = '0.6.0';
 export const DEFAULT_BASE_URL = 'https://breakwire.org';
 
 type FetchLike = (input: string, init?: any) => Promise<any>;
@@ -23,6 +24,12 @@ export interface BreakwireOptions {
   fetch?: FetchLike;
   /** Extra literal strings or patterns to strip before sending (e.g. your own tokens). */
   secrets?: Array<string | RegExp>;
+  /**
+   * Extra origins (e.g. "https://staging.example") a redirect may lead to. By default only https://breakwire.org and
+   * the base URL's origin are trusted. Redirects to any other origin are refused (nothing is re-sent), and credentials
+   * (Authorization, Cookie) never cross origins: an authenticated request redirected to another origin is refused.
+   */
+  trustedOrigins?: string[];
 }
 
 export interface LookupOptions {
@@ -76,8 +83,10 @@ export interface LookupResult {
   miss?: { gap?: { id: string; status: string; url: string } | string; coverage_note?: string; note?: string; [k: string]: unknown };
   [k: string]: unknown;
 }
-/** Input for stack() / subscribe(): any mix of parsed fields and raw files (package.json, requirements*.txt,
- * pyproject.toml, .nvmrc, vercel.json, netlify.toml, .github/workflows/*.yml). Only dependency facts are kept. */
+/** Input for stack() / subscribe(): any mix of parsed fields and raw files (package.json, package-lock.json, yarn.lock,
+ * requirements*.txt, pyproject.toml, poetry.lock, uv.lock, Pipfile.lock, .nvmrc, .python-version, vercel.json,
+ * netlify.toml, .github/workflows/*.yml). Files are parsed in your process; only dependency and runtime facts are sent
+ * (see previewStack). Pass { rawFiles: true } to send the files themselves instead. */
 export interface StackInput {
   dependencies?: Record<string, string>; devDependencies?: Record<string, string>; engines?: Record<string, string>;
   packages?: string[]; services?: string[]; runtime?: string;
@@ -85,7 +94,11 @@ export interface StackInput {
   package_json?: string | object; requirements_txt?: string; pyproject_toml?: string;
   [k: string]: unknown;
 }
-export interface SubscribeOptions {
+export interface StackSendOptions {
+  /** Explicit opt-in: send the raw files/fields as given (the pre-0.6 behavior) instead of locally parsed facts. */
+  rawFiles?: boolean;
+}
+export interface SubscribeOptions extends StackSendOptions {
   /** Alert this many days ahead of a deadline (1-180, default 30). */
   horizonDays?: number;
   /** Opt in to new-model launch alerts: true (the stack's services) or a list of service slugs. */
@@ -103,6 +116,11 @@ export class BreakwireError extends Error {
   status: number; body: unknown;
   constructor(message: string, status: number, body: unknown) { super(message); this.name = 'BreakwireError'; this.status = status; this.body = body; }
 }
+
+const STACK_FIELDS = new Set(['files', 'package_json', 'requirements_txt', 'pyproject_toml', 'requirements', 'workflows', 'nvmrc', 'netlify_toml', 'vercel_json',
+  'dependencies', 'devDependencies', 'peerDependencies', 'engines', 'packages', 'runtime', 'services', 'ecosystem']);
+const REDIRECT_CODES = new Set([301, 302, 303, 307, 308]);
+const originOf = (u: string): string => new URL(u).origin;
 
 const envVar = (k: string): string | undefined => {
   try { return (globalThis as any).process?.env?.[k] || undefined; } catch { return undefined; }
@@ -135,8 +153,22 @@ function httpStatusOf(err: unknown): number | undefined {
   return typeof s === 'number' && s >= 100 && s < 600 ? s : undefined;
 }
 
+/** Exactly what the client would send for this error after local redaction (pass extra secrets to strip too). */
+export function previewRedaction(input: unknown, secrets: Array<string | RegExp> = []): string {
+  const plain = input && typeof input === 'object' && !(input instanceof Error) && (Array.isArray(input) || [Object.prototype, null].includes(Object.getPrototypeOf(input)));
+  return redactSecrets(plain || typeof input === 'string' ? input : errorText(input), secrets);
+}
+
+/** Exactly the /api/stack (or /api/subscriptions) body the client would send for this input. */
+export function previewStack(input: StackInput, opts: StackSendOptions = {}): Record<string, unknown> {
+  return opts.rawFiles ? { ...input } : normalizeStack(input as Record<string, any>).body;
+}
+
 export class Breakwire {
   readonly baseUrl: string; readonly timeoutMs: number;
+  /** Origins a redirect may lead to (breakwire.org, the base URL's origin, options.trustedOrigins). */
+  readonly trustedOrigins: ReadonlySet<string>;
+  private pinnedOrigins: Set<string>;
   private apiKey?: string; private ua: string; readonly channel: string; private f: FetchLike; private secrets: Array<string | RegExp>;
 
   constructor(opts: BreakwireOptions = {}) {
@@ -149,10 +181,15 @@ export class Breakwire {
     if (!f) throw new Error('breakwire: no fetch available (Node 18+, Workers, Deno, Bun and browsers have one; or pass options.fetch)');
     this.f = f.bind ? f.bind(globalThis) : f;
     this.secrets = opts.secrets || [];
+    this.pinnedOrigins = new Set([originOf(DEFAULT_BASE_URL), ...(opts.trustedOrigins || []).map(originOf)]);
+    this.trustedOrigins = new Set([originOf(this.baseUrl), ...this.pinnedOrigins]);
   }
 
   /** Strip secrets with the built-in rules plus your configured extra secrets. */
   redact(text: unknown): string { return redactSecrets(text, this.secrets); }
+
+  /** Exactly what lookup() would send as the error text for this input, with this client's extra secrets. */
+  previewRedaction(input: unknown): string { return previewRedaction(input, this.secrets); }
 
   async request<T = any>(method: string, path: string, body?: unknown, auth = false, bearer?: string): Promise<T> {
     const headers: Record<string, string> = { accept: 'application/json', 'user-agent': this.ua, 'x-breakwire-client': this.channel };
@@ -163,15 +200,18 @@ export class Breakwire {
     const timer = setTimeout(() => ctrl.abort(), this.timeoutMs);
     try {
       let url = this.baseUrl + path;
-      const init: any = { method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal: ctrl.signal, redirect: 'manual' };
-      let res = await this.f(url, init);
-      // Host moves (workers.dev -> breakwire.org) answer 301. fetch would turn a redirected POST into a GET,
-      // so re-send the same method and body to the new location once.
-      for (let i = 0; i < 2 && res.status >= 301 && res.status <= 308 && res.headers?.get?.('location'); i++) {
-        url = new URL(res.headers.get('location'), url).toString();
-        res = await this.f(url, init);
+      let req: { method: string; headers: Record<string, string>; body?: string } = { method, headers, body: body === undefined ? undefined : JSON.stringify(body) };
+      let res: any;
+      for (let hop = 0; ; hop++) {
+        res = await this.f(url, { ...req, signal: ctrl.signal, redirect: 'manual' });
+        // Browsers hide manual redirects (opaqueredirect): the target cannot be checked, so never follow blindly.
+        if (res.type === 'opaqueredirect') throw new BreakwireError(`Breakwire ${method} ${path}: redirect target not inspectable; set baseUrl to the final URL`, 0, null);
+        const loc = REDIRECT_CODES.has(res.status) ? res.headers?.get?.('location') : null;
+        if (!loc) break;
+        if (hop >= 3) throw new BreakwireError(`Breakwire ${method} ${path}: too many redirects`, res.status, null);
+        const next = this.followRedirect(url, String(loc), res.status, req, path);
+        url = next.url; req = next.req;
       }
-      if (res.type === 'opaqueredirect') res = await this.f(url, { ...init, redirect: 'follow' });
       const text = await res.text();
       let data: any = text;
       try { data = text ? JSON.parse(text) : null; } catch { /* non-JSON */ }
@@ -180,8 +220,33 @@ export class Breakwire {
     } finally { clearTimeout(timer); }
   }
 
-  /** Match an error against documented signatures and claims. The error text is redacted before it is sent. */
-  lookup(error: unknown, opts: LookupOptions = {}): Promise<LookupResult> {
+  /**
+   * Redirect policy (0.6.0): follow only to trusted origins (breakwire.org, the base URL's origin, trustedOrigins);
+   * never carry Authorization or Cookie to another origin (such a redirect is refused); no https -> http downgrade;
+   * 307/308 keep the method and body; 301/302/303 turn GET/HEAD into GET and are an error for requests with a body
+   * unless the target origin is pinned (breakwire.org or trustedOrigins), where the same request is re-sent.
+   */
+  private followRedirect(from: string, location: string, status: number, req: { method: string; headers: Record<string, string>; body?: string }, path: string) {
+    const target = new URL(location, from);
+    const fail = (why: string) => new BreakwireError(`Breakwire ${req.method} ${path}: refused ${status} redirect to ${target.origin}: ${why}`, status, { location: target.origin + target.pathname });
+    if (target.protocol !== 'https:' && target.protocol !== 'http:') throw fail('unsupported scheme');
+    if (new URL(from).protocol === 'https:' && target.protocol !== 'https:') throw fail('https -> http downgrade');
+    if (!this.trustedOrigins.has(target.origin)) throw fail('untrusted origin (add it to trustedOrigins if it is yours)');
+    const crossOrigin = target.origin !== originOf(from);
+    const headers = { ...req.headers };
+    if (crossOrigin) {
+      if (Object.keys(headers).some((h) => /^(authorization|cookie|proxy-authorization)$/i.test(h))) throw fail('credentials never cross origins; set baseUrl to the new origin');
+      for (const h of Object.keys(headers)) if (/^(authorization|cookie|proxy-authorization)$/i.test(h)) delete headers[h];
+    }
+    const m = req.method.toUpperCase();
+    if (status === 307 || status === 308) return { url: target.toString(), req: { ...req, headers } };
+    if (m === 'GET' || m === 'HEAD') return { url: target.toString(), req: { method: m, headers, body: undefined } };
+    if (!this.pinnedOrigins.has(target.origin)) throw fail(`a ${status} would drop the ${m} body; update baseUrl (or pin the origin with trustedOrigins)`);
+    return { url: target.toString(), req: { ...req, headers } };
+  }
+
+  /** The exact /api/lookup request body for this error and options (redacted). Also the local cache key. */
+  lookupBody(error: unknown, opts: LookupOptions = {}): Record<string, unknown> {
     const text = this.redact(errorText(error));
     const body: Record<string, unknown> = { error: text };
     if (opts.service) body.service = opts.service;
@@ -199,7 +264,12 @@ export class Breakwire {
     if (opts.minScore != null) body.min_score = Math.max(0, Math.min(1, opts.minScore));
     if (opts.since) body.since = opts.since;
     if (opts.reflex === false) body.reflex = false;
-    return this.request<LookupResult>('POST', '/api/lookup', body);
+    return body;
+  }
+
+  /** Match an error against documented signatures and claims. The error text is redacted before it is sent. */
+  lookup(error: unknown, opts: LookupOptions = {}): Promise<LookupResult> {
+    return this.request<LookupResult>('POST', '/api/lookup', this.lookupBody(error, opts));
   }
 
   /** Status of a gap ticket returned on a miss, e.g. gap("UX-0123456789"). */
@@ -269,11 +339,15 @@ export class Breakwire {
   }
 
 
-  /** package.json fields, raw files or ["name@version", ...] -> applicable deadlines, advisories and breaking changes.
-   * An empty stack returns 200 with { empty: true, hint }. */
-  stack(input: StackInput): Promise<any> {
-    return this.request('POST', '/api/stack', input);
+  /** package.json fields, files or ["name@version", ...] -> applicable deadlines, advisories and breaking changes.
+   * Files are parsed locally and only dependency/runtime facts are sent (previewStack shows the body); { rawFiles: true }
+   * sends the raw input instead. An empty stack returns 200 with { empty: true, hint }. */
+  stack(input: StackInput, opts: StackSendOptions = {}): Promise<any> {
+    return this.request('POST', '/api/stack', previewStack(input, opts));
   }
+
+  /** The exact body stack()/subscribe() would send for this input. Nothing is sent. */
+  previewStack(input: StackInput, opts: StackSendOptions = {}): Record<string, unknown> { return previewStack(input, opts); }
 
   /**
    * Register a stack once and get alerts when a deadline or breaking change that affects it comes up.
@@ -281,7 +355,7 @@ export class Breakwire {
    * No email or personal data is asked for or stored; only dependency facts from the input are kept.
    */
   subscribe(input: StackInput, opts: SubscribeOptions = {}): Promise<any> {
-    const body: Record<string, unknown> = { ...input };
+    const body: Record<string, unknown> = previewStack(input, opts);
     if (opts.horizonDays) body.horizon_days = opts.horizonDays;
     if (opts.webhookUrl) body.webhook_url = opts.webhookUrl;
     if (opts.launches) body.launches = opts.launches;
@@ -295,8 +369,11 @@ export class Breakwire {
   }
 
   /** Change the stack, horizon or webhook (webhookUrl null removes it). Needs the manage_token from subscribe(). */
-  updateSubscription(subscriptionId: string, manageToken: string, patch: StackInput & { horizon_days?: number; webhook_url?: string | null }): Promise<any> {
-    return this.request('PATCH', `/api/subscriptions/${subscriptionId}`, patch, false, manageToken);
+  updateSubscription(subscriptionId: string, manageToken: string, patch: StackInput & { horizon_days?: number; webhook_url?: string | null }, opts: StackSendOptions = {}): Promise<any> {
+    const stack: Record<string, unknown> = {}, rest: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(patch)) (STACK_FIELDS.has(k) ? stack : rest)[k] = v;
+    const body: Record<string, unknown> = { ...(Object.keys(stack).length ? previewStack(stack, opts) : {}), ...rest };
+    return this.request('PATCH', `/api/subscriptions/${subscriptionId}`, body, false, manageToken);
   }
 
   /** Delete a subscription (clears the stored stack and webhook URL). Needs the manage_token. */

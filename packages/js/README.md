@@ -1,5 +1,9 @@
 # breakwire
 
+<!-- versions:begin (generated from versions.json by scripts/versions.mjs; do not edit) -->
+**Current release:** clients **0.6.0** (npm `breakwire`, PyPI `breakwire`, PyPI `langchain-breakwire`) · server **0.8.0** · GitHub Action `breakwire-check` **1.1.1** · [CHANGELOG](https://github.com/breakwire-org/breakwire/blob/main/CHANGELOG.md)
+<!-- versions:end -->
+
 Look up an API, SDK or platform error and get the source-linked breaking change, deprecation or advisory that explains
 it, with the fix. Client for [Breakwire](https://breakwire.org), a registry of changes that break AI agents.
 
@@ -96,9 +100,11 @@ await bw.report('AN-2026-0025', 'confirmed', env); // claim report, needs apiKey
 
 `report()` is for outcomes you actually observed. Please don't send test reports.
 
-`stack()` also takes raw files: `bw.stack({ files: { 'package.json': text, '.github/workflows/ci.yml': yml } })`
-(package.json, requirements*.txt, pyproject.toml, .nvmrc, vercel.json, netlify.toml, workflow YAML). An empty stack
-returns 200 with `{ empty: true, hint }`.
+`stack()` also takes files: `bw.stack({ files: { 'package.json': text, '.github/workflows/ci.yml': yml } })`
+(package.json, package-lock.json, yarn.lock, requirements*.txt, pyproject.toml, poetry.lock, uv.lock, Pipfile.lock,
+.nvmrc, .python-version, vercel.json, netlify.toml, workflow YAML). Since 0.6.0 they are parsed in your process and only
+dependency and runtime facts are sent; `previewStack(input)` shows the exact body and `{ rawFiles: true }` sends the raw
+files instead. An empty stack returns 200 with `{ empty: true, hint }`.
 
 ## Stack alerts (0.2.0): register once, get told before a deadline hits
 
@@ -144,6 +150,30 @@ reports yet, and the site says so on every claim instead of calling it verified.
 prefer the linked source.
 
 MIT. API docs: https://breakwire.org/llms.txt · OpenAPI: https://breakwire.org/openapi.json · MCP: https://breakwire.org/mcp
+
+## 0.6.0
+
+Security and correctness release ([CHANGELOG](../../CHANGELOG.md), [SECURITY](../../SECURITY.md)).
+
+- **Redirect policy.** Redirects are followed only to `https://breakwire.org`, the base URL's origin and
+  `new Breakwire({ trustedOrigins: ['https://staging.example'] })`. `Authorization` / `Cookie` never cross origins
+  (such a redirect is refused), no https to http, only 307/308 keep method and body, and a 301/302/303 on a POST is a
+  `BreakwireError` unless the target origin is pinned.
+- **Stack files are parsed locally.** `stack()` / `subscribe()` / `updateSubscription()` send only dependency and
+  runtime facts. `previewStack(input)` (or `bw.previewStack(input)`) returns the exact body; `bw.stack(input, { rawFiles: true })`
+  is the explicit opt-in to send raw files. `normalizeStack(input)` also returns the ignored file names.
+
+  ```ts
+  import { previewStack } from 'breakwire';
+  previewStack({ files: { 'package.json': pkgText, 'package-lock.json': lockText, '.github/workflows/ci.yml': yml } });
+  // -> { dependencies: {...}, engines: {...}, packages: ['npm:next@16.0.1', ...], workflows: ['uses: actions/checkout@v4'] }
+  ```
+- **Retry in no-log mode.** `withBreakwire(fn, { retry })` now runs the retry whenever a match came back; only
+  `autoReport` needs a lookup id.
+- **Cache keys** cover the full redacted request body (model, sdk, version, httpStatus, crossService, context,
+  minScore, maxMatches, compact, since, reflex, noLog, service). `bw.lookupBody(err, opts)` returns that body.
+- **Redaction:** IPv6, UUIDs, request/trace ids, filesystem/Windows/UNC paths, credentials in any URI scheme and
+  secret-named JSON fields. `previewRedaction(err)` / `bw.previewRedaction(err)` show exactly what would be sent.
 
 ## 0.5.0
 

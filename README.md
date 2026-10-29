@@ -1,5 +1,9 @@
 # Breakwire clients, MCP config and CI check
 
+<!-- versions:begin (generated from versions.json by scripts/versions.mjs; do not edit) -->
+**Current release:** clients **0.6.0** (npm `breakwire`, PyPI `breakwire`, PyPI `langchain-breakwire`) · server **0.8.0** · GitHub Action `breakwire-check` **1.1.1** · [CHANGELOG](https://github.com/breakwire-org/breakwire/blob/main/CHANGELOG.md)
+<!-- versions:end -->
+
 [Breakwire](https://breakwire.org) is a source-linked registry of changes that break AI agents: model retirements, API
 deprecations, SDK breaking releases, MCP spec changes and security advisories. Send it an error, get back the claim
 that explains it (e.g. `AN-2026-0025`) with the vendor's documented error string, affected versions, deadline, fix and
@@ -43,33 +47,26 @@ with with_breakwire(service="openai-api"):
 Step one each time: `GET https://breakwire.org/api/changes?from=<your training cutoff>` (changes, new model launches,
 revisions). Fail open: if Breakwire is slow or down, carry on. Details: [triggers/TRIGGERS.md](triggers/TRIGGERS.md).
 
-## 0.4.0 (clients) / server 0.7.0
+## What's new in 0.6.0 (clients)
 
-- Every lookup answer carries `cite` (a ready-to-paste citation with the claim URL), an optional one-line `reflex`
-  snippet (`reflex: false` drops it) and, on an exact vendor-signature match, `please`: the one call that reports
-  whether the fix worked.
-- A miss is no longer empty: `miss` has a gap ticket (`UX-…`, status at `GET /api/gaps/{id}`), a one-line coverage
-  note, the service's nearest claims, upcoming deadlines and changes since a date (`since`, default 30 days).
-  `explained` stays false.
-- JS `lookup(err, { since, reflex })` and `gap(id)`; Python `lookup(..., since=, reflex=)` and `gap(id)`; LangChain's
-  lookup tool passes `cite`, `please` and `miss` through.
-- Agent files on the server: `/llms.txt` (short, lookup first), `/llms-full.txt`, `/.well-known/mcp/server.json`,
-  `/.well-known/agent-card.json` (A2A), `/skill.md`, `/sitemap.xml`. All MCP tools have titles and annotations.
+Security and correctness release; see [CHANGELOG.md](CHANGELOG.md) and [SECURITY.md](SECURITY.md).
 
-## 0.3.0 (clients)
-
-- `report()` / `close_lookup` accept every lookup outcome: fixed, partial, applies, not_fixed, wrong_match, not_covered,
-  solved (needs a note). JS and Python behave the same.
-- `lookup()` takes `compact`, `max_matches` / `maxMatches`, `min_score` / `minScore`; Python gained `compact` (it already
-  had `no_log`).
-- New `launches()` and `changes()`; `subscribe(..., launches=True)` opts in to new-model alerts.
-- LangChain: `breakwire_close_lookup` and `breakwire_changes` tools; the lookup tool can set `no_log` / `min_score`.
+- **Redirects never carry credentials or bodies to another origin.** Clients follow redirects only to
+  `https://breakwire.org`, the base URL's origin and any `trustedOrigins` / `trusted_origins` you pin.
+- **Stack files are parsed in your process.** `stack()` / `subscribe()` send only dependency and runtime facts;
+  `previewStack()` / `preview_stack()` show the exact body; raw files need `rawFiles: true` / `raw_files=True`.
+- **Retry works in the default no-log mode**, and the local cache keys on every lookup option.
+- **Broader local redaction** (IPv6, UUIDs, request/trace ids, filesystem and UNC paths, credentials in any URI scheme,
+  secret-named JSON fields) with `previewRedaction()` / `preview_redaction()`.
+- Python `with_breakwire` accepts every `lookup()` option (`compact`, `min_score`, `max_matches`, `since`, `reflex`).
 
 ## Principles
 
 - **Opt-in and harmless.** Lookups happen only on errors, are time-boxed, and never throw or replace your error.
-- **Secrets stay home.** Keys, tokens, emails, IPs, query strings and home paths are stripped in your process before
-  sending ([shared test cases](tests/redaction-cases.json)); the server redacts again.
+- **Secrets stay home.** Keys, tokens, emails, IPv4/IPv6 addresses, UUIDs and request ids, query strings, credentials
+  in URLs and filesystem paths are stripped in your process before sending ([shared test cases](tests/redaction-cases.json);
+  `previewRedaction()` / `preview_redaction()` show exactly what would leave); the server redacts again. Stack files are
+  parsed locally and only dependency facts are sent. Redirects never carry credentials or bodies to another origin.
 - **No silent reporting.** Outcome reports ("did the fix work") are sent only with `autoReport`/`auto_report` on, and
   only after your retry actually ran.
 - **Honest data.** `signature` vs `related` confidence, explicit "not covered" for services without claims, and
@@ -83,7 +80,13 @@ cd packages/python && python -m unittest discover -s tests
 cd packages/langchain-breakwire && python -m unittest discover -s tests
 cd action && npm test
 cd snippets && npm ci && npm test                  # real SDKs against a mock vendor + live Breakwire
+node scripts/versions.mjs --check                  # fails on stale versions (edit versions.json, run without --check)
 ```
+
+Versions live in one place, [versions.json](versions.json). `node scripts/versions.mjs` writes them into the package
+manifests, source constants and the README banners; CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs the
+check plus every suite. Shared cross-language fixtures: [tests/](tests) (redaction, redirect policy, stack parsing,
+lookup option contract).
 
 Live tests use `log_miss: false` and never send outcome reports. Set `BREAKWIRE_BASE_URL` to point at another deployment.
 

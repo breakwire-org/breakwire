@@ -10,8 +10,9 @@ import urllib.request
 from typing import Any, Dict, Iterable, List, Optional, Union
 
 from ._redact import redact_secrets
+from ._stack import STACK_FIELDS, normalize_stack
 
-__version__ = "0.5.0"
+__version__ = "0.6.0"
 LOOKUP_OUTCOMES = ("fixed", "partial", "applies", "not_fixed", "wrong_match", "not_covered", "solved")
 DEFAULT_BASE_URL = "https://breakwire.org"
 _CID = re.compile(r"^AN-\d{4}-\d{4,}$")
@@ -28,12 +29,44 @@ class BreakwireError(Exception):
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
-    # urllib turns a redirected POST into a GET without a body; we re-send ourselves instead.
+    # Never let urllib follow redirects: Breakwire.request applies its own policy (see _follow_redirect).
     def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: D401
         return None
 
 
 _opener = urllib.request.build_opener(_NoRedirect)
+_REDIRECT_CODES = (301, 302, 303, 307, 308)
+_CREDENTIAL_HEADERS = ("authorization", "cookie", "proxy-authorization")
+
+
+def _origin(url: str) -> str:
+    """scheme://host[:port] with the default port dropped (like JS URL.origin)."""
+    p = urllib.parse.urlsplit(url)
+    scheme = (p.scheme or "").lower()
+    host = (p.hostname or "").lower()
+    if ":" in host:
+        host = f"[{host}]"
+    port = p.port
+    default = {"https": 443, "http": 80}.get(scheme)
+    return f"{scheme}://{host}" + (f":{port}" if port and port != default else "")
+
+
+def preview_redaction(value: Any, secrets: Optional[Iterable[Union[str, "re.Pattern[str]"]]] = None) -> str:
+    """Exactly what the client would send as the error text for this value (exception, text or dict) after redaction."""
+    if isinstance(value, (str, dict, list, tuple)):
+        return redact_secrets(value, secrets)
+    return redact_secrets(error_text(value), secrets)
+
+
+def preview_stack(raw_files: bool = False, **stack: Any) -> Dict[str, Any]:
+    """Exactly the /api/stack (or /api/subscriptions) body stack()/subscribe() would send. Nothing is sent.
+
+    Default: files and raw fields are parsed locally; only dependency and runtime facts remain.
+    raw_files=True: the input as given (explicit opt-in to send raw file contents).
+    """
+    body = _stack_body(stack.pop("dependencies", None), stack.pop("dev_dependencies", None), stack.pop("engines", None),
+                       stack.pop("packages", None), stack.pop("files", None), stack)
+    return body if raw_files else normalize_stack(body)["body"]
 
 
 def error_text(err: Any) -> str:
@@ -88,7 +121,7 @@ class Breakwire:
 
     def __init__(self, base_url: Optional[str] = None, timeout: float = 3.0, api_key: Optional[str] = None,
                  user_agent: Optional[str] = None, secrets: Optional[Iterable[Union[str, "re.Pattern[str]"]]] = None,
-                 channel: Optional[str] = None):
+                 channel: Optional[str] = None, trusted_origins: Optional[Iterable[str]] = None):
         self.base_url = (base_url or os.environ.get("BREAKWIRE_BASE_URL") or DEFAULT_BASE_URL).rstrip("/")
         self.timeout = timeout
         self.api_key = api_key or os.environ.get("BREAKWIRE_API_KEY")
@@ -99,9 +132,16 @@ class Breakwire:
         # (aggregate counts only). Integrations pass their own, e.g. channel="kit/cursor".
         ch = channel or os.environ.get("BREAKWIRE_CLIENT") or f"breakwire-py/{__version__}"
         self.channel = "".join(c for c in str(ch) if 0x21 <= ord(c) <= 0x7e)[:80] or f"breakwire-py/{__version__}"
+        # Redirects may only lead to these origins; credentials never cross origins (see _follow_redirect).
+        self._pinned_origins = {_origin(DEFAULT_BASE_URL), *(_origin(o) for o in (trusted_origins or ()))}
+        self.trusted_origins = frozenset({_origin(self.base_url), *self._pinned_origins})
 
     def redact(self, text: Any) -> str:
         return redact_secrets(text, self.secrets)
+
+    def preview_redaction(self, value: Any) -> str:
+        """Exactly what lookup() would send as the error text for this value, with this client's extra secrets."""
+        return preview_redaction(value, self.secrets)
 
     def request(self, method: str, path: str, body: Any = None, auth: bool = False, bearer: Optional[str] = None) -> Any:
         url = self.base_url + path
@@ -113,20 +153,64 @@ class Breakwire:
             headers["authorization"] = f"Bearer {self.api_key}"
         if bearer:
             headers["authorization"] = f"Bearer {bearer}"
-        for _ in range(3):
-            req = urllib.request.Request(url, data=data, headers=headers, method=method)
+        m = method
+        for hop in range(4):
+            req = urllib.request.Request(url, data=data, headers=headers, method=m)
             try:
                 with _opener.open(req, timeout=self.timeout) as resp:
                     return self._decode(resp.read())
             except urllib.error.HTTPError as e:
                 loc = e.headers.get("location") if e.headers else None
-                if e.code in (301, 302, 303, 307, 308) and loc:
-                    url = urllib.parse.urljoin(url, loc)  # re-send same method + body to the new host
+                if e.code in _REDIRECT_CODES and loc:
+                    try:
+                        e.close()
+                    except Exception:
+                        pass
+                    if hop >= 3:
+                        break
+                    url, m, headers, data = self._follow_redirect(url, loc, e.code, m, headers, data, path)
                     continue
                 payload = self._decode(e.read())
                 detail = f": {payload.get('error')}" if isinstance(payload, dict) and payload.get("error") else ""
                 raise BreakwireError(f"Breakwire {method} {path} -> {e.code}{detail}", e.code, payload) from None
         raise BreakwireError(f"Breakwire {method} {path}: too many redirects", 310)
+
+    def _follow_redirect(self, current: str, location: str, code: int, method: str, headers: Dict[str, str],
+                         data: Optional[bytes], path: str):
+        """Redirect policy (0.6.0), same as the JS client.
+
+        Follow only to trusted origins (breakwire.org, the base URL's origin, trusted_origins); never carry
+        Authorization or Cookie to another origin (such a redirect is refused); no https -> http downgrade;
+        307/308 keep method and body; 301/302/303 turn GET/HEAD into GET and are an error for requests with a body
+        unless the target origin is pinned (breakwire.org or trusted_origins), where the same request is re-sent.
+        """
+        target = urllib.parse.urljoin(current, location)
+        t_origin = _origin(target)
+
+        def fail(why: str) -> BreakwireError:
+            loc = t_origin + urllib.parse.urlsplit(target).path
+            return BreakwireError(f"Breakwire {method} {path}: refused {code} redirect to {t_origin}: {why}", code, {"location": loc})
+
+        scheme = urllib.parse.urlsplit(target).scheme.lower()
+        if scheme not in ("http", "https"):
+            raise fail("unsupported scheme")
+        if urllib.parse.urlsplit(current).scheme.lower() == "https" and scheme != "https":
+            raise fail("https -> http downgrade")
+        if t_origin not in self.trusted_origins:
+            raise fail("untrusted origin (add it to trusted_origins if it is yours)")
+        h = dict(headers)
+        if t_origin != _origin(current):
+            if any(k.lower() in _CREDENTIAL_HEADERS for k in h):
+                raise fail("credentials never cross origins; set base_url to the new origin")
+        m = method.upper()
+        if code in (307, 308):
+            return target, method, h, data
+        if m in ("GET", "HEAD"):
+            h.pop("content-type", None)
+            return target, "GET", h, None
+        if t_origin not in self._pinned_origins:
+            raise fail(f"a {code} would drop the {m} body; update base_url (or pin the origin with trusted_origins)")
+        return target, method, h, data
 
     @staticmethod
     def _decode(raw: bytes) -> Any:
@@ -149,6 +233,17 @@ class Breakwire:
         The answer carries `cite` (claim URL), `please` (on an exact match) and `miss` (gap ticket, nearest claims).
         Fail open: if Breakwire is slow or down this raises BreakwireError; the error-path helpers never raise.
         """
+        return self.request("POST", "/api/lookup", self.lookup_body(
+            error, service=service, sdk=sdk, version=version, model=model, http_status=http_status, context=context,
+            cross_service=cross_service, log_miss=log_miss, no_log=no_log, compact=compact, max_matches=max_matches,
+            min_score=min_score, since=since, reflex=reflex))
+
+    def lookup_body(self, error: Any, service: Optional[str] = None, sdk: Optional[str] = None, version: Optional[str] = None,
+                    model: Optional[str] = None, http_status: Optional[int] = None, context: Optional[str] = None,
+                    cross_service: bool = False, log_miss: bool = True, no_log: bool = False, compact: bool = False,
+                    max_matches: Optional[int] = None, min_score: Optional[float] = None,
+                    since: Optional[str] = None, reflex: bool = True) -> Dict[str, Any]:
+        """The exact /api/lookup request body for this error and options (redacted). Also the local cache key."""
         body: Dict[str, Any] = {"error": self.redact(error_text(error))}
         if service:
             body["service"] = service
@@ -179,7 +274,7 @@ class Breakwire:
             body["since"] = since
         if reflex is False:
             body["reflex"] = False
-        return self.request("POST", "/api/lookup", body)
+        return body
 
     def gap(self, gap_id: str) -> Dict[str, Any]:
         """Status of a gap ticket returned on a miss, e.g. gap("UX-0123456789")."""
@@ -250,13 +345,23 @@ class Breakwire:
 
     def stack(self, dependencies: Optional[Dict[str, str]] = None, dev_dependencies: Optional[Dict[str, str]] = None,
               engines: Optional[Dict[str, str]] = None, packages: Optional[List[str]] = None,
-              files: Optional[Union[Dict[str, str], List[Dict[str, str]]]] = None, **extra: Any) -> Dict[str, Any]:
-        """package.json fields, ["name@version", ...] or raw files -> applicable deadlines, advisories and breaking changes.
+              files: Optional[Union[Dict[str, str], List[Dict[str, str]]]] = None, raw_files: bool = False,
+              **extra: Any) -> Dict[str, Any]:
+        """package.json fields, ["name@version", ...] or files -> applicable deadlines, advisories and breaking changes.
 
-        files: {"requirements.txt": text, "pyproject.toml": text, "package.json": text, ".github/workflows/ci.yml": yml}.
+        files: {"requirements.txt": text, "pyproject.toml": text, "package.json": text, "poetry.lock": text,
+        ".github/workflows/ci.yml": yml, ...}. Files are parsed in this process and only dependency and runtime facts
+        are sent (preview_stack(...) returns the exact body). raw_files=True is the explicit opt-in to send the raw files.
         An empty stack returns 200 with {"empty": True, "hint": ...}.
         """
-        return self.request("POST", "/api/stack", _stack_body(dependencies, dev_dependencies, engines, packages, files, extra))
+        return self.request("POST", "/api/stack", preview_stack(raw_files=raw_files, dependencies=dependencies,
+                                                                dev_dependencies=dev_dependencies, engines=engines,
+                                                                packages=packages, files=files, **extra))
+
+    @staticmethod
+    def preview_stack(raw_files: bool = False, **stack: Any) -> Dict[str, Any]:
+        """The exact body stack()/subscribe() would send for these arguments. Nothing is sent."""
+        return preview_stack(raw_files=raw_files, **stack)
 
     @staticmethod
     def files_from(*paths: str) -> Dict[str, str]:
@@ -271,15 +376,14 @@ class Breakwire:
         return out
 
     def subscribe(self, horizon_days: Optional[int] = None, webhook_url: Optional[str] = None,
-                  launches: Optional[Union[bool, List[str]]] = None, **stack: Any) -> Dict[str, Any]:
+                  launches: Optional[Union[bool, List[str]]] = None, raw_files: bool = False, **stack: Any) -> Dict[str, Any]:
         """Register a stack once; get alerts when a deadline or breaking change that affects it comes up.
 
-        Same stack arguments as stack(). Returns id, manage_token (shown once: store it), feed {json, atom, rss},
-        webhook (if webhook_url: status + secret), now, remember. No email or personal data is asked for.
+        Same stack arguments as stack() (parsed locally unless raw_files=True). Returns id, manage_token (shown once:
+        store it), feed {json, atom, rss}, webhook (if webhook_url: status + secret), now, remember. No email or
+        personal data is asked for.
         """
-        files = stack.pop("files", None)
-        body = _stack_body(stack.pop("dependencies", None), stack.pop("dev_dependencies", None), stack.pop("engines", None),
-                           stack.pop("packages", None), files, stack)
+        body = preview_stack(raw_files=raw_files, **stack)
         if horizon_days:
             body["horizon_days"] = int(horizon_days)
         if webhook_url:
@@ -294,9 +398,16 @@ class Breakwire:
             raise ValueError(f"not a subscription id: {subscription_id!r}")
         return self.request("GET", f"/api/subscriptions/{subscription_id}/feed")
 
-    def update_subscription(self, subscription_id: str, manage_token: str, **patch: Any) -> Dict[str, Any]:
-        """Change stack / horizon_days / webhook_url (None removes the webhook). Needs the manage_token."""
-        return self.request("PATCH", f"/api/subscriptions/{subscription_id}", patch, bearer=manage_token)
+    def update_subscription(self, subscription_id: str, manage_token: str, raw_files: bool = False, **patch: Any) -> Dict[str, Any]:
+        """Change stack / horizon_days / webhook_url (None removes the webhook). Needs the manage_token.
+
+        Stack fields are parsed locally like stack() unless raw_files=True.
+        """
+        stack_keys = STACK_FIELDS | {"dev_dependencies"}
+        stack = {k: v for k, v in patch.items() if k in stack_keys}
+        body = preview_stack(raw_files=raw_files, **stack) if stack else {}
+        body.update({k: v for k, v in patch.items() if k not in stack_keys})
+        return self.request("PATCH", f"/api/subscriptions/{subscription_id}", body, bearer=manage_token)
 
     def unsubscribe(self, subscription_id: str, manage_token: str) -> Dict[str, Any]:
         """Delete a subscription (clears the stored stack and webhook URL)."""

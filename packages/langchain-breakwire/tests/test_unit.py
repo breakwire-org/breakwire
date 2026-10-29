@@ -2,6 +2,7 @@
 import pathlib
 import sys
 import unittest
+from uuid import UUID
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
@@ -56,7 +57,8 @@ class T(unittest.TestCase):
         self.assertTrue(BreakwireStackTool(client=f).invoke({})["empty"])
         names = [t.name for t in breakwire_tools(client=f)]
         self.assertEqual(names, ["breakwire_lookup_error", "breakwire_close_lookup", "breakwire_changes", "breakwire_deadlines", "breakwire_check_stack"])
-        self.assertEqual(__version__, "0.5.0")
+        import re
+        self.assertEqual(__version__, re.search(r'^version = "([^"]+)"', (ROOT / "pyproject.toml").read_text(), re.M).group(1))
 
     def test_callback_handler_no_log_default(self):
         f = Fake()
@@ -93,6 +95,62 @@ class T(unittest.TestCase):
         h = BreakwireCallbackHandler()
         self.assertEqual(h.client.channel, f"langchain-breakwire/{__version__}")
         self.assertEqual(breakwire_tools()[0].client.channel, f"langchain-breakwire/{__version__}")
+
+    def test_stack_tool_sends_parsed_facts_only(self):
+        import json as _json
+        from unittest import mock
+        import breakwire.client as bwc
+        sent = []
+
+        class Op:
+            def open(self, req, timeout=None):
+                sent.append(_json.loads(req.data))
+
+                class R:
+                    def read(self):
+                        return b'{"applicable": []}'
+
+                    def __enter__(self):
+                        return self
+
+                    def __exit__(self, *a):
+                        return False
+                return R()
+
+        pkg = '{"name": "@acme/secret", "scripts": {"x": "curl https://deploy.internal"}, "dependencies": {"next": "16.0.1", "own": "file:../own"}}'
+        with mock.patch.object(bwc, "_opener", Op()):
+            out = BreakwireStackTool(client=Breakwire()).invoke({"files": {"package.json": pkg}})
+        self.assertEqual(out["total"], 0)
+        self.assertEqual(sent, [{"dependencies": {"next": "16.0.1"}}])
+
+    def test_callback_handler_forwards_every_lookup_option(self):
+        import json as _json
+        from unittest import mock
+        import breakwire.client as bwc
+        from breakwire import clear_cache
+        clear_cache()
+        sent = []
+
+        class Op:
+            def open(self, req, timeout=None):
+                sent.append(_json.loads(req.data))
+
+                class R:
+                    def read(self):
+                        return _json.dumps(LOOKUP).encode()
+
+                    def __enter__(self):
+                        return self
+
+                    def __exit__(self, *a):
+                        return False
+                return R()
+
+        with mock.patch.object(bwc, "_opener", Op()):
+            h = BreakwireCallbackHandler(service="openai-api", client=Breakwire(), compact=True, min_score=0.4, max_matches=2, model="gpt-x")
+            h.on_llm_error(ValueError("429 rate limited"), run_id=UUID(int=1))
+        self.assertEqual({k: sent[0].get(k) for k in ("compact", "min_score", "max_matches", "model", "no_log")},
+                         {"compact": True, "min_score": 0.4, "max_matches": 2, "model": "gpt-x", "no_log": True})
 
 
 if __name__ == "__main__":

@@ -24,8 +24,9 @@ export interface WrapOptions extends BreakwireOptions, LookupOptions {
   /** Lookup timeout in ms (default 2500). The original error is rethrown after at most this long. */
   timeoutMs?: number;
   /**
-   * Local cache of lookup results keyed by the redacted error text + service, so a retry loop does not repeat the
-   * same request. Default { ttlMs: 600000, max: 200 }; false turns it off.
+   * Local cache of lookup results keyed by the base URL + the complete redacted request body (error, service, model,
+   * sdk, sdk version, http status, context, cross-service, thresholds, compact, no-log, ...), so a retry loop does not
+   * repeat the same request but different options never share an answer. Default { ttlMs: 600000, max: 200 }; false turns it off.
    */
   cache?: false | { ttlMs?: number; max?: number };
   /** Only look up errors for which this returns true (e.g. skip your own validation errors). */
@@ -33,7 +34,7 @@ export interface WrapOptions extends BreakwireOptions, LookupOptions {
   /** Called with the match info (after it is attached to the error). Errors thrown here are ignored. */
   onMatch?: (info: BreakwireInfo, err: unknown) => void;
   /**
-   * Optional: try a fix. Called when a lookup returned a match. Return a promise to retry (e.g. with the
+   * Optional: try a fix. Called when a lookup returned a match (also in the default no-log mode: no lookup id needed). Return a promise to retry (e.g. with the
    * suggested model / parameter), or undefined to skip. If it resolves, its value is returned instead of throwing.
    */
   retry?: (info: BreakwireInfo, err: unknown, args: any[]) => Promise<any> | undefined;
@@ -59,6 +60,17 @@ function cacheGet(key: string, ttl: number): BreakwireInfo | null {
 function cachePut(key: string, info: BreakwireInfo, max: number): void {
   resultCache.set(key, { at: Date.now(), info });
   while (resultCache.size > max) resultCache.delete(resultCache.keys().next().value as string);
+}
+/** Base URL + canonical (sorted-key) JSON of the full redacted request body. */
+function cacheKey(client: Breakwire, err: unknown, opts: LookupOptions): string {
+  const body = typeof (client as any).lookupBody === 'function' ? client.lookupBody(err, opts) : { error: client.redact(errorText(err)), ...opts, client: undefined };
+  return `${client.baseUrl}|${canonical(body)}`;
+}
+function canonical(v: unknown): string {
+  if (v === undefined) return 'null';
+  if (v === null || typeof v !== 'object') return JSON.stringify(v);
+  if (Array.isArray(v)) return `[${v.map(canonical).join(',')}]`;
+  return `{${Object.keys(v as object).sort().filter((k) => (v as any)[k] !== undefined && typeof (v as any)[k] !== 'function').map((k) => `${JSON.stringify(k)}:${canonical((v as any)[k])}`).join(',')}}`;
 }
 /** Drop every locally cached lookup result. */
 export function clearBreakwireCache(): void { resultCache.clear(); }
@@ -92,7 +104,7 @@ export async function explain(err: unknown, opts: WrapOptions = {}): Promise<Bre
     const lookupOpts: WrapOptions = { ...opts, noLog: opts.noLog ?? !opts.autoReport };
     const useCache = opts.cache !== false && !opts.autoReport;
     const cfg = opts.cache || {}; const ttl = cfg.ttlMs ?? 600000, max = cfg.max ?? 200;
-    const key = useCache ? `${client.baseUrl}|${opts.service || ''}|${lookupOpts.noLog ? 1 : 0}|${client.redact(errorText(err)).slice(0, 2000)}` : '';
+    const key = useCache ? cacheKey(client, err, lookupOpts) : '';
     if (useCache) { const hit = cacheGet(key, ttl); if (hit) return hit; }
     let timer: any;
     const timeout = new Promise<never>((_, rej) => { timer = setTimeout(() => rej(new Error(`breakwire lookup timed out after ${timeoutMs} ms`)), timeoutMs); });
@@ -128,7 +140,8 @@ export function withBreakwire<A extends any[], R>(fn: (...args: A) => R | Promis
       const info = await explain(err, { ...opts, client });
       attach(err, info);
       try { opts.onMatch?.(info, err); } catch { /* ignore */ }
-      if (opts.retry && info.lookupId && info.id) {
+      // The retry only needs a match. A lookup id is needed only to report the outcome (autoReport).
+      if (opts.retry && info.id) {
         let p: Promise<any> | undefined;
         try { p = opts.retry(info, err, args); } catch { p = undefined; }
         if (p && typeof (p as any).then === 'function') {
@@ -148,6 +161,7 @@ export function withBreakwire<A extends any[], R>(fn: (...args: A) => R | Promis
 }
 
 async function safeReport(client: Breakwire, info: BreakwireInfo, outcome: 'fixed' | 'not_fixed', env?: ReportEnv, retryErr?: unknown): Promise<void> {
+  if (!info.lookupId || !info.id) return; // no-log lookups have nothing to close
   try {
     await client.report(info.lookupId!, outcome, env || {}, { cid: info.id!, note: outcome === 'not_fixed' ? `retry with suggested fix still failed: ${client.redact(String((retryErr as any)?.message || retryErr)).slice(0, 300)}` : undefined });
   } catch { /* never surface Breakwire failures */ }

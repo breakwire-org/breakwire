@@ -1,0 +1,267 @@
+{
+ "api_key": "bwk_live_SECRETKEY_never_cross_0123",
+ "bearer": "bwm_manage_SECRET_token_456",
+ "cases": [
+  {
+   "name": "authenticated outcome POST redirected to another origin (307) is refused; the other origin is never contacted",
+   "base_url": "https://breakwire.org",
+   "request": {
+    "method": "POST",
+    "path": "/api/lookups/lk_abc123/outcome",
+    "auth": "api_key",
+    "body": {
+     "outcome": "fixed",
+     "note": "private details"
+    }
+   },
+   "redirect": {
+    "status": 307,
+    "location": "https://attacker.example/collect"
+   },
+   "expect": {
+    "follow": false
+   }
+  },
+  {
+   "name": "authenticated POST 308 to another origin is refused",
+   "base_url": "https://breakwire.org",
+   "request": {
+    "method": "POST",
+    "path": "/api/claims/AN-2026-0001/reports",
+    "auth": "api_key",
+    "body": {
+     "outcome": "confirmed"
+    }
+   },
+   "redirect": {
+    "status": 308,
+    "location": "https://evil.test/api/claims/AN-2026-0001/reports"
+   },
+   "expect": {
+    "follow": false
+   }
+  },
+  {
+   "name": "manage-token PATCH redirected to breakwire.org from a custom base (cross-origin, trusted) is refused: credentials never cross origins",
+   "base_url": "https://staging.example",
+   "request": {
+    "method": "PATCH",
+    "path": "/api/subscriptions/sub_aaaaaaaaaaaaaaaaaaaaaaaa",
+    "auth": "bearer",
+    "body": {
+     "horizon_days": 7
+    }
+   },
+   "redirect": {
+    "status": 308,
+    "location": "https://breakwire.org/api/subscriptions/sub_aaaaaaaaaaaaaaaaaaaaaaaa"
+   },
+   "expect": {
+    "follow": false
+   }
+  },
+  {
+   "name": "authenticated GET 302 to another origin is refused",
+   "base_url": "https://breakwire.org",
+   "request": {
+    "method": "GET",
+    "path": "/api/claims/AN-2026-0001",
+    "auth": "api_key",
+    "body": null
+   },
+   "redirect": {
+    "status": 302,
+    "location": "https://cdn.other.example/x"
+   },
+   "expect": {
+    "follow": false
+   }
+  },
+  {
+   "name": "anonymous POST 301 to an untrusted origin is refused (body never re-sent)",
+   "base_url": "https://old.test",
+   "request": {
+    "method": "POST",
+    "path": "/api/lookup",
+    "auth": null,
+    "body": {
+     "error": "x"
+    }
+   },
+   "redirect": {
+    "status": 301,
+    "location": "https://new.test/api/lookup"
+   },
+   "expect": {
+    "follow": false
+   }
+  },
+  {
+   "name": "anonymous GET 303 to an untrusted origin is refused",
+   "base_url": "https://breakwire.org",
+   "request": {
+    "method": "GET",
+    "path": "/api/services",
+    "auth": null,
+    "body": null
+   },
+   "redirect": {
+    "status": 303,
+    "location": "https://evil.test/"
+   },
+   "expect": {
+    "follow": false
+   }
+  },
+  {
+   "name": "https -> http downgrade on the same host is refused",
+   "base_url": "https://breakwire.org",
+   "request": {
+    "method": "GET",
+    "path": "/api/services",
+    "auth": null,
+    "body": null
+   },
+   "redirect": {
+    "status": 301,
+    "location": "http://breakwire.org/api/services"
+   },
+   "expect": {
+    "follow": false
+   }
+  },
+  {
+   "name": "anonymous POST 301 on the same, unpinned origin is a migration error (would drop the body)",
+   "base_url": "https://x.test",
+   "request": {
+    "method": "POST",
+    "path": "/api/lookup",
+    "auth": null,
+    "body": {
+     "error": "x"
+    }
+   },
+   "redirect": {
+    "status": 301,
+    "location": "https://x.test/v2/api/lookup"
+   },
+   "expect": {
+    "follow": false
+   }
+  },
+  {
+   "name": "host move to pinned breakwire.org (workers.dev -> breakwire.org 301) re-sends the anonymous POST",
+   "base_url": "https://breakwire.workers.dev",
+   "request": {
+    "method": "POST",
+    "path": "/api/lookup",
+    "auth": null,
+    "body": {
+     "error": "x"
+    }
+   },
+   "redirect": {
+    "status": 301,
+    "location": "https://breakwire.org/api/lookup"
+   },
+   "expect": {
+    "follow": true,
+    "method": "POST",
+    "body_kept": true,
+    "auth_kept": false,
+    "url": "https://breakwire.org/api/lookup"
+   }
+  },
+  {
+   "name": "trusted_origins pins an extra origin for a 301 host move",
+   "base_url": "https://old.test",
+   "trusted_origins": [
+    "https://new.test"
+   ],
+   "request": {
+    "method": "POST",
+    "path": "/api/lookup",
+    "auth": null,
+    "body": {
+     "error": "x"
+    }
+   },
+   "redirect": {
+    "status": 301,
+    "location": "https://new.test/api/lookup"
+   },
+   "expect": {
+    "follow": true,
+    "method": "POST",
+    "body_kept": true,
+    "auth_kept": false,
+    "url": "https://new.test/api/lookup"
+   }
+  },
+  {
+   "name": "same-origin 307 keeps method, body and credentials",
+   "base_url": "https://breakwire.org",
+   "request": {
+    "method": "POST",
+    "path": "/api/lookups/lk_abc123/outcome",
+    "auth": "api_key",
+    "body": {
+     "outcome": "fixed"
+    }
+   },
+   "redirect": {
+    "status": 307,
+    "location": "/api/v2/lookups/lk_abc123/outcome"
+   },
+   "expect": {
+    "follow": true,
+    "method": "POST",
+    "body_kept": true,
+    "auth_kept": true,
+    "url": "https://breakwire.org/api/v2/lookups/lk_abc123/outcome"
+   }
+  },
+  {
+   "name": "same-origin 302 on GET is followed as GET",
+   "base_url": "https://x.test",
+   "request": {
+    "method": "GET",
+    "path": "/api/services",
+    "auth": null,
+    "body": null
+   },
+   "redirect": {
+    "status": 302,
+    "location": "https://x.test/api/services/"
+   },
+   "expect": {
+    "follow": true,
+    "method": "GET",
+    "body_kept": false,
+    "auth_kept": false,
+    "url": "https://x.test/api/services/"
+   }
+  },
+  {
+   "name": "anonymous GET 301 from a custom base to trusted breakwire.org is followed",
+   "base_url": "https://mirror.example",
+   "request": {
+    "method": "GET",
+    "path": "/api/services",
+    "auth": null,
+    "body": null
+   },
+   "redirect": {
+    "status": 301,
+    "location": "https://breakwire.org/api/services"
+   },
+   "expect": {
+    "follow": true,
+    "method": "GET",
+    "body_kept": false,
+    "auth_kept": false,
+    "url": "https://breakwire.org/api/services"
+   }
+  }
+ ]
+}

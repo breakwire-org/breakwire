@@ -5,6 +5,7 @@ import asyncio
 import concurrent.futures
 import functools
 import inspect
+import json
 from dataclasses import dataclass, field
 import threading
 import time
@@ -48,12 +49,20 @@ class BreakwireInfo:
         return f"Breakwire {self.id} ({self.confidence}): {self.title}\n  fix: {self.fix}\n  {self.url}"
 
 
-_LOOKUP_KEYS = ("service", "sdk", "version", "model", "http_status", "context", "cross_service", "log_miss", "no_log")
+# Every option Breakwire.lookup() accepts, derived from its signature so the wrappers can never drift from the client.
+_LOOKUP_KEYS = tuple(n for n, p in inspect.signature(Breakwire.lookup).parameters.items()
+                     if n not in ("self", "error") and p.kind in (p.POSITIONAL_OR_KEYWORD, p.KEYWORD_ONLY))
 
 _cache: "OrderedDict[str, Tuple[float, BreakwireInfo]]" = OrderedDict()
 _cache_lock = threading.Lock()
 CACHE_TTL = 600.0  # seconds
 CACHE_MAX = 200
+
+
+def _cache_key(c: Breakwire, err: Any, kw: Dict[str, Any]) -> str:
+    body_fn = getattr(c, "lookup_body", None)
+    body = body_fn(err, **kw) if callable(body_fn) else {"error": c.redact(error_text(err)), **kw}
+    return f"{c.base_url}|" + json.dumps(body, sort_keys=True, separators=(",", ":"), default=str)
 
 
 def clear_cache() -> None:
@@ -66,8 +75,10 @@ def explain(err: Any, client: Optional[Breakwire] = None, timeout: float = 2.5, 
     """Look up an error. Never raises; returns at most ``timeout`` seconds later.
 
     Privacy: no_log=True by default (the server stores nothing about the lookup); pass no_log=False to let misses
-    count as anonymous coverage gaps and get a lookup_id. Results are cached in-process (10 min, 200 entries) by
-    redacted error text + service; cache=False skips it.
+    count as anonymous coverage gaps and get a lookup_id. Results are cached in-process (10 min, 200 entries) keyed by
+    the base URL + the complete redacted request body (error, service, model, sdk, version, http_status, context,
+    cross_service, min_score, max_matches, compact, no_log, ...), so different options never share an answer;
+    cache=False skips it. Accepts every Breakwire.lookup() option.
     """
     try:
         c = client or Breakwire(timeout=timeout)
@@ -75,7 +86,7 @@ def explain(err: Any, client: Optional[Breakwire] = None, timeout: float = 2.5, 
         kw.setdefault("no_log", True)
         key = ""
         if cache:
-            key = f"{c.base_url}|{kw.get('service') or ''}|{int(bool(kw['no_log']))}|{c.redact(error_text(err))[:2000]}"
+            key = _cache_key(c, err, kw)
             with _cache_lock:
                 hit = _cache.get(key)
                 if hit and time.monotonic() - hit[0] <= CACHE_TTL:
@@ -112,6 +123,8 @@ def _attach(exc: BaseException, info: BreakwireInfo, add_note: bool) -> None:
 
 
 def _safe_report(client: Breakwire, info: BreakwireInfo, outcome: str, env: Optional[Dict[str, str]], retry_err: Any = None) -> None:
+    if not info.lookup_id or not info.id:  # no-log lookups have nothing to close
+        return
     try:
         note = f"retry with suggested fix still failed: {client.redact(retry_err)[:300]}" if retry_err is not None else None
         client.report(info.lookup_id or "", outcome, env or {}, cid=info.id, note=note)
@@ -132,6 +145,9 @@ class with_breakwire:
     Options: should_lookup(exc) -> bool; on_match(info, exc); retry(info, exc, *args, **kwargs) -> result or SKIP (decorator only);
     auto_report=True (explicit opt-in) reports the retry's outcome on the lookup; report_env={...}.
     Privacy: lookups are sent with no_log=True unless you pass no_log=False (auto_report implies no_log=False).
+    retry runs whenever a match came back (a lookup id is not needed); only auto_report needs the lookup id.
+    Lookup options: every Breakwire.lookup() keyword (service, sdk, version, model, http_status, context, cross_service,
+    log_miss, no_log, compact, max_matches, min_score, since, reflex).
     """
 
     def __init__(self, func: Optional[Callable] = None, *, client: Optional[Breakwire] = None, timeout: float = 2.5,
@@ -226,7 +242,7 @@ class with_breakwire:
             return self._func(*args, **kwargs)  # type: ignore[misc]
         except Exception as exc:
             info = self._handle(exc)
-            if self.retry and info and info.lookup_id and info.id:
+            if self.retry and info and info.id:  # retry needs a match, not a lookup id (no-log default)
                 try:
                     value = self.retry(info, exc, *args, **kwargs)
                 except Exception as retry_exc:
@@ -246,7 +262,7 @@ class with_breakwire:
         except Exception as exc:
             loop = asyncio.get_running_loop()
             info = await loop.run_in_executor(None, self._handle, exc)
-            if self.retry and info and info.lookup_id and info.id:
+            if self.retry and info and info.id:  # retry needs a match, not a lookup id (no-log default)
                 try:
                     value = self.retry(info, exc, *args, **kwargs)
                     if inspect.isawaitable(value):

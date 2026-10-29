@@ -99,12 +99,12 @@
  {
   "in": "ENOENT: no such file or directory, open '/home/alice/project/.env'",
   "absent": [
-   "alice"
+   "alice",
+   "/home/alice/project"
   ],
   "present": [
    "ENOENT",
-   "/home/",
-   "project/.env"
+   "<path>/.env"
   ]
  },
  {
@@ -181,6 +181,182 @@
   ],
   "present": [
    "in header"
+  ]
+ },
+ {
+  "in": "connect ECONNREFUSED [2001:db8:85a3::8a2e:370:7334]:443",
+  "absent": [
+   "2001:db8:85a3::8a2e:370:7334"
+  ],
+  "present": [
+   "ECONNREFUSED",
+   "[<ip>]:443"
+  ]
+ },
+ {
+  "in": "getaddrinfo failed for fe80::1ff:fe23:4567:890a and ::1 and ::ffff:192.0.2.1.",
+  "absent": [
+   "fe80::1ff:fe23:4567:890a",
+   "::1 ",
+   "192.0.2.1"
+  ],
+  "present": [
+   "getaddrinfo failed for"
+  ]
+ },
+ {
+  "in": "Ruby NameError Foo::Bar at 12:30:45, std::vector, MCP error -32601",
+  "absent": [],
+  "present": [
+   "Foo::Bar",
+   "12:30:45",
+   "std::vector",
+   "MCP error -32601"
+  ]
+ },
+ {
+  "in": "account 123e4567-e89b-12d3-a456-426614174000 not found",
+  "absent": [
+   "123e4567-e89b-12d3-a456-426614174000"
+  ],
+  "present": [
+   "account <uuid> not found"
+  ]
+ },
+ {
+  "in": "overloaded_error (request_id: req_011CPXa9bTzR8vQ2mLk4Jd7e) x-request-id: 8f3a2c1d-77aa cf-ray: 8c1f2b3a4d5e6f70-SJC",
+  "absent": [
+   "req_011CPXa9bTzR8vQ2mLk4Jd7e",
+   "8f3a2c1d-77aa",
+   "8c1f2b3a4d5e6f70"
+  ],
+  "present": [
+   "overloaded_error"
+  ]
+ },
+ {
+  "in": "traceparent 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01 upstream 503",
+  "absent": [
+   "4bf92f3577b34da6a3ce929d0e0e4736"
+  ],
+  "present": [
+   "upstream 503"
+  ]
+ },
+ {
+  "in": "Error: ENOENT: no such file or directory, open '/srv/acme-internal/billing/config/prod.yml'",
+  "absent": [
+   "acme-internal",
+   "billing"
+  ],
+  "present": [
+   "ENOENT",
+   "<path>/prod.yml"
+  ]
+ },
+ {
+  "in": "Cannot find module '/opt/build/repo/node_modules/@anthropic-ai/sdk/index.js'",
+  "absent": [
+   "/opt/build/repo"
+  ],
+  "present": [
+   "<path>/node_modules/@anthropic-ai/sdk/index.js"
+  ]
+ },
+ {
+  "in": "404 Not Found: POST /internal/billing/charge and /v1/messages and https://api.openai.com/v1/chat/completions",
+  "absent": [],
+  "present": [
+   "POST /internal/billing/charge",
+   "/v1/messages",
+   "https://api.openai.com/v1/chat/completions"
+  ]
+ },
+ {
+  "in": "File \"/usr/lib/python3/dist-packages/openai/_base_client.py\", line 1059",
+  "absent": [
+   "/usr/lib/python3"
+  ],
+  "present": [
+   "<path>/dist-packages/openai/_base_client.py",
+   "line 1059"
+  ]
+ },
+ {
+  "in": "open C:\\Projects\\AcmeSecret\\config\\app.json failed; also C:\\Users\\bob",
+  "absent": [
+   "AcmeSecret",
+   "bob"
+  ],
+  "present": [
+   "<path>\\app.json",
+   "failed"
+  ]
+ },
+ {
+  "in": "cannot read \\\\fileserver01\\finance\\q3\\report.xlsx",
+  "absent": [
+   "fileserver01",
+   "finance"
+  ],
+  "present": [
+   "cannot read",
+   "<path>\\report.xlsx"
+  ]
+ },
+ {
+  "in": "push failed https://ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123@github.com/acme/repo.git and amqps://guest:s3cr3t@mq.internal:5671 and mongodb+srv://app:pa55word@cluster0.mongodb.net/db and wss://feed.example/live?token=abc123def",
+  "absent": [
+   "ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123",
+   "s3cr3t",
+   "pa55word",
+   "token=abc123def",
+   "guest"
+  ],
+  "present": [
+   "github.com/acme/repo.git",
+   "mq.internal:5671",
+   "cluster0.mongodb.net",
+   "wss://feed.example/live"
+  ]
+ },
+ {
+  "in": "{\"error\":{\"type\":\"invalid_request_error\",\"message\":\"bad\"},\"client_secret\":\"cs_9x8y7z\",\"accessToken\":\"opaque-value-1\",\"x-api-key\":\"kv-123\",\"max_tokens\":\"4096\",\"model\":\"claude-x\"}",
+  "absent": [
+   "cs_9x8y7z",
+   "opaque-value-1",
+   "kv-123"
+  ],
+  "present": [
+   "invalid_request_error",
+   "\"max_tokens\":\"4096\"",
+   "\"model\":\"claude-x\""
+  ]
+ },
+ {
+  "in": {
+   "error": "rate_limit_error",
+   "config": {
+    "apiKey": "plainvalue1",
+    "privateKey": "pk-raw",
+    "password": "hunter2",
+    "nested": [
+     {
+      "sessionToken": "tok"
+     }
+    ],
+    "max_tokens": 1024
+   }
+  },
+  "absent": [
+   "plainvalue1",
+   "pk-raw",
+   "hunter2",
+   "\"tok\""
+  ],
+  "present": [
+   "rate_limit_error",
+   "\"max_tokens\":1024"
   ]
  }
 ]

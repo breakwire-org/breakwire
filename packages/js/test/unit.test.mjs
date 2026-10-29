@@ -71,11 +71,11 @@ test('errorText: name, message, status, code, nested API error, cause; no stack'
   assert.ok(!t.includes('at '), 'no stack frames');
 });
 
-test('POST is re-sent with same method/body across a 301 host move', async () => {
-  const f = mockFetch((c) => c.url.startsWith('https://old.test') ? { status: 301, headers: { location: 'https://new.test/api/lookup' }, body: '' } : { body: LOOKUP });
+test('anonymous POST is re-sent across a 301 host move to pinned breakwire.org (see test/v060 for the full redirect policy)', async () => {
+  const f = mockFetch((c) => c.url.startsWith('https://old.test') ? { status: 301, headers: { location: 'https://breakwire.org/api/lookup' }, body: '' } : { body: LOOKUP });
   const r = await new Breakwire({ baseUrl: 'https://old.test', fetch: f }).lookup('some error text');
   assert.equal(r.lookup_id, 'lk_abc123');
-  assert.equal(f.calls[1].url, 'https://new.test/api/lookup'); assert.equal(f.calls[1].method, 'POST'); assert.equal(f.calls[1].body.error, 'some error text');
+  assert.equal(f.calls[1].url, 'https://breakwire.org/api/lookup'); assert.equal(f.calls[1].method, 'POST'); assert.equal(f.calls[1].body.error, 'some error text');
 });
 
 test('deadlines, claim, stack, services hit the right routes', async () => {
@@ -201,7 +201,7 @@ test('CommonJS build loads', () => {
 });
 
 // ---- 0.2.0: error-path defaults, cache, subscriptions, webhook verification ----
-test('version is 0.5.0', () => { assert.equal(VERSION, '0.5.0'); });
+test('version matches package.json', () => { assert.equal(VERSION, JSON.parse(readFileSync(new URL('../package.json', import.meta.url))).version); });
 
 test('explain(): no-log by default, opt out with noLog:false', async () => {
   clearBreakwireCache();
