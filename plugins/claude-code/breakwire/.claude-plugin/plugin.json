@@ -1,11 +1,20 @@
 {
   "name": "breakwire",
   "displayName": "Breakwire",
-  "version": "0.3.1",
-  "description": "Checks Breakwire first on unfamiliar API/SDK errors, on code that names a model id or SDK version, and before deploys or upgrades (step one: what changed since your training cutoff).",
-  "author": { "name": "Breakwire", "url": "https://breakwire.org" },
+  "version": "0.4.0",
+  "description": "Session-start brief (silent when nothing changed for your stack), plus Breakwire first on unfamiliar API/SDK errors, model ids or SDK versions in code, and deploys or upgrades.",
+  "author": {
+    "name": "Breakwire",
+    "url": "https://breakwire.org"
+  },
   "homepage": "https://breakwire.org",
   "repository": "https://github.com/breakwire-org/breakwire",
   "license": "MIT",
-  "keywords": ["errors", "breaking-changes", "deprecations", "model-launches", "mcp"]
+  "keywords": [
+    "errors",
+    "breaking-changes",
+    "deprecations",
+    "model-launches",
+    "mcp"
+  ]
 }

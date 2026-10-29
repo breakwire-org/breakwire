@@ -1,7 +1,7 @@
 # breakwire
 
 <!-- versions:begin (generated from versions.json by scripts/versions.mjs; do not edit) -->
-**Current release:** clients **0.6.0** (npm `breakwire`, PyPI `breakwire`, PyPI `langchain-breakwire`) · server **0.9.0** · GitHub Action `breakwire-check` **1.2.0** · [CHANGELOG](https://github.com/breakwire-org/breakwire/blob/main/CHANGELOG.md)
+**Current release:** clients **0.7.0** (npm `breakwire`, PyPI `breakwire`, PyPI `langchain-breakwire`) · server **0.10.0** · GitHub Action `breakwire-check` **1.2.0** · [CHANGELOG](https://github.com/breakwire-org/breakwire/blob/main/CHANGELOG.md)
 <!-- versions:end -->
 
 Look up an API, SDK or platform error and get the source-linked breaking change, deprecation or advisory that explains
@@ -17,6 +17,20 @@ it, with the fix. Client for [Breakwire](https://breakwire.org), a registry of c
 ```bash
 npm install breakwire
 ```
+
+## Session start: the brief (0.7.0)
+
+```js
+import { Breakwire } from 'breakwire';
+const bw = new Breakwire();
+const brief = await bw.sessionBrief({ services: ['openai-api'], packages: ['npm:openai@4.77.0'], runtime: { node: '22' }, models: ['gpt-4o'] });
+if (brief.context) addToAgentContext(brief.context);   // null when clear or unavailable: inject nothing
+```
+
+`decision` is `clear`, `act` (up to 5 items with `why_now`, `action`, `source_url`) or `block` (a confirmed
+incompatibility or security exposure in this exact stack). The cursor and fingerprint are kept in
+`~/.breakwire/session-brief.json` (0600; `state: false` for memory only), so later calls send only those and get a 304
+when nothing changed. Fail-open. From a shell or a session hook: `npx breakwire brief [dir]` prints nothing when clear.
 
 ## Look up an error
 

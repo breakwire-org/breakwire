@@ -169,12 +169,13 @@ test('stack() sends only parsed facts by default; rawFiles is an explicit opt-in
   const bw = new Breakwire({ fetch: f });
   const input = STACK[0].input;
   await bw.stack(input);
-  assert.deepEqual(f.calls[0].body, previewStack(input));
-  assert.deepEqual(f.calls[0].body, bw.previewStack(input));
+  const MODES = { strict: true, compact: true, include_related: false }; // 0.7.0 defaults
+  assert.deepEqual(f.calls[0].body, { ...previewStack(input), ...MODES });
+  assert.deepEqual(f.calls[0].body, { ...bw.previewStack(input), ...MODES });
   assert.ok(!('files' in f.calls[0].body));
   assert.ok(!f.calls[0].rawBody.includes('scripts'));
   await bw.stack(input, { rawFiles: true });
-  assert.deepEqual(f.calls[1].body, input);
+  assert.deepEqual(f.calls[1].body, { ...input, ...MODES });
   assert.deepEqual(previewStack(input, { rawFiles: true }), input);
 });
 

@@ -17,8 +17,10 @@ for lookups and reads.
      }
    }
    ```
-2. Save. The server should connect and list 20 tools, including `lookup_error`, `search_error` (read-only), `changes`, `model_launches` and `check_stack`.
-3. Test: call `list_services` (no arguments), then `lookup_error` with
+2. Save. The server should connect and list 3 tools: `session_brief`, `lookup_error` and `close_lookup`. All 21 tools
+   (`search_error`, `changes`, `model_launches`, `check_stack`, ...) still work by name; to list them all, use
+   `https://breakwire.org/mcp/full` as the URL instead.
+3. Test: call `session_brief` with `{"services": ["anthropic-api"]}`, then `lookup_error` with
    `{"error": "tool_choice: type \"tool\" and \"any\" are not supported for this model.", "service": "anthropic-api"}`.
    Expect a match `AN-2026-0025` with `confidence: "signature"`.
 4. Optional: write tools (`report_outcome`, `watch`, `submit_claim`) need a key. Register at

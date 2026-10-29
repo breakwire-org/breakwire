@@ -40,6 +40,32 @@ class Fake(Breakwire):
 
 
 class T(unittest.TestCase):
+    def test_session_brief_tool_clear_is_empty_and_act_has_items(self):
+        from langchain_breakwire import BreakwireSessionBriefTool
+
+        class B(Fake):
+            def session_brief(self, **kw):
+                self.calls.append(("brief", None, kw))
+                if kw.get("services") == ["clear"]:
+                    return {"decision": "clear", "next_cursor": 5, "context": None}
+                return {"decision": "act", "items": [{"cid": "AN-2026-0080", "action": "A", "source_url": "U"}], "context": "x"}
+        f = B()
+        self.assertEqual(BreakwireSessionBriefTool(client=f).invoke({"services": ["clear"]}), {"decision": "clear"})
+        out = BreakwireSessionBriefTool(client=f).invoke({"services": ["x"], "models": ["gpt-4o"]})
+        self.assertEqual(out["items"][0]["cid"], "AN-2026-0080")
+        self.assertEqual(f.calls[1][2]["models"], ["gpt-4o"])
+
+    def test_stack_tool_reads_compact_items(self):
+        class C(Fake):
+            def stack(self, **kw):
+                return {"decision": "act", "items": [{"cid": "AN-2026-0080", "bucket": "exactly_applies", "title": "T", "date": "2026-04-30",
+                                                      "action": "Move to 22", "citation": "https://nodejs.org/x"}]}
+        out = BreakwireStackTool(client=C()).invoke({"packages": ["node@20"]})
+        self.assertEqual(out["decision"], "act")
+        self.assertEqual(out["applicable"][0]["fix"], "Move to 22")
+        self.assertEqual(out["applicable"][0]["url"], "https://nodejs.org/x")
+        self.assertEqual(out["applicable"][0]["deadline"], "2026-04-30")
+
     def test_lookup_tool(self):
         f = Fake()
         t = BreakwireLookupTool(client=f)
@@ -56,7 +82,7 @@ class T(unittest.TestCase):
         self.assertEqual(out["remember"], "R")
         self.assertTrue(BreakwireStackTool(client=f).invoke({})["empty"])
         names = [t.name for t in breakwire_tools(client=f)]
-        self.assertEqual(names, ["breakwire_lookup_error", "breakwire_close_lookup", "breakwire_changes", "breakwire_deadlines", "breakwire_check_stack"])
+        self.assertEqual(names, ["breakwire_session_brief", "breakwire_lookup_error", "breakwire_close_lookup", "breakwire_changes", "breakwire_deadlines", "breakwire_check_stack"])
         import re
         self.assertEqual(__version__, re.search(r'^version = "([^"]+)"', (ROOT / "pyproject.toml").read_text(), re.M).group(1))
 
@@ -121,7 +147,7 @@ class T(unittest.TestCase):
         with mock.patch.object(bwc, "_opener", Op()):
             out = BreakwireStackTool(client=Breakwire()).invoke({"files": {"package.json": pkg}})
         self.assertEqual(out["total"], 0)
-        self.assertEqual(sent, [{"dependencies": {"next": "16.0.1"}}])
+        self.assertEqual(sent, [{"dependencies": {"next": "16.0.1"}, "strict": True, "compact": True, "include_related": False}])
 
     def test_callback_handler_forwards_every_lookup_option(self):
         import json as _json

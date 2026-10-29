@@ -1,6 +1,6 @@
 {
   "$comment": "Single source of truth for released versions. Run `node scripts/versions.mjs` to write them into packages and doc banners; CI runs `node scripts/versions.mjs --check` and fails on drift.",
-  "clients": "0.6.0",
-  "server": "0.9.0",
+  "clients": "0.7.0",
+  "server": "0.10.0",
   "action": "1.2.0"
 }

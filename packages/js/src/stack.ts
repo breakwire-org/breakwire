@@ -209,8 +209,18 @@ export function normalizeStack(input: Record<string, any> = {}): NormalizeResult
   if (reqs.size) body.requirements = Array.from(reqs).sort().join('\n');
   if (Object.keys(rt).length) body.runtime = sortObj(rt);
   if (uses.size) body.workflows = [Array.from(uses).sort().map((u) => `uses: ${u}`).join('\n')];
+  // 0.7.0 (server 0.9.0+): model ids, feature flags and installed versions are facts, not files: cleaned and passed through
+  const strList = (v: unknown, n: number) => Array.isArray(v) ? Array.from(new Set(v.filter((x): x is string => typeof x === 'string' && !!x.trim() && !/:\/\//.test(x)).map((x) => x.trim().slice(0, 100)))).slice(0, n) : [];
+  const models = strList(input.models, 50), features = strList(input.features, 50);
+  if (models.length) body.models = models;
+  if (features.length) body.features = features;
+  if (input.installed && typeof input.installed === 'object' && !Array.isArray(input.installed)) {
+    const inst: Record<string, string> = {};
+    for (const [k, v] of Object.entries(input.installed)) if ((typeof v === 'string' || typeof v === 'number') && /^[@\w./:-]{1,214}$/.test(k)) inst[k] = String(v).slice(0, 64);
+    if (Object.keys(inst).length) body.installed = sortObj(inst);
+  }
   for (const [k, v] of Object.entries(input)) {
-    if (RAW_KEYS.has(k) || k in body || (DEP_KEYS as readonly string[]).includes(k) || ['engines', 'packages', 'runtime', 'services', 'ecosystem'].includes(k)) continue;
+    if (RAW_KEYS.has(k) || k in body || (DEP_KEYS as readonly string[]).includes(k) || ['engines', 'packages', 'runtime', 'services', 'ecosystem', 'models', 'features', 'installed'].includes(k)) continue;
     if (typeof v === 'number' || typeof v === 'boolean') body[k] = v; // e.g. horizon_days; strings/objects are not forwarded
   }
   return { body, ignored };

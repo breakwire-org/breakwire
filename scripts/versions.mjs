@@ -26,6 +26,7 @@ const pinned = [
   ['packages/langchain-breakwire/pyproject.toml', [[/^version = "([^"]+)"/m, C], [/"breakwire>=([^"]+)"/, C]]],
   ['packages/langchain-breakwire/src/langchain_breakwire/__init__.py', [[/^__version__ = "([^"]+)"/m, C]]],
   ['action/package.json', [[/"version": "([^"]+)"/, A]]],
+  ['plugins/claude-code/breakwire/hooks/hooks.json', [[/npx -y breakwire@(\d+\.\d+\.\d+)/, C]]],
 ];
 const banners = ['README.md', 'packages/js/README.md', 'packages/python/README.md', 'packages/langchain-breakwire/README.md'];
 // Docs that must not advertise another version as current (history lives in CHANGELOG.md / "## x.y.z" sections).

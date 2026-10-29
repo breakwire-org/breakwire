@@ -2,7 +2,7 @@
 errors raised inside chains, LLM calls and tools.
 
     from langchain_breakwire import breakwire_tools, BreakwireCallbackHandler
-    tools = breakwire_tools()   # lookup_error, deadlines, check_stack
+    tools = breakwire_tools()   # session_brief, lookup_error, close_lookup, changes, deadlines, check_stack
 """
 from __future__ import annotations
 
@@ -14,8 +14,8 @@ from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel, ConfigDict, Field
 
-__version__ = "0.6.0"
-__all__ = ["BreakwireLookupTool", "BreakwireReportTool", "BreakwireChangesTool", "BreakwireDeadlinesTool", "BreakwireStackTool", "BreakwireCallbackHandler",
+__version__ = "0.7.0"
+__all__ = ["BreakwireSessionBriefTool", "BreakwireLookupTool", "BreakwireReportTool", "BreakwireChangesTool", "BreakwireDeadlinesTool", "BreakwireStackTool", "BreakwireCallbackHandler",
            "breakwire_tools", "__version__"]
 
 
@@ -130,20 +130,55 @@ class BreakwireStackTool(BaseTool):
             if r.get("empty"):
                 return {"empty": True, "hint": r.get("hint")}
             items = r.get("items") or r.get("applicable") or []
-            return {
-                "applicable": [{"id": i.get("cid"), "title": i.get("title"), "deadline": i.get("deadline"), "days_left": i.get("days_left"),
-                                "fix": i.get("fix"), "url": i.get("url")} for i in items[: self.max_items]],
+            out = {
+                "applicable": [{"id": i.get("cid"), "title": i.get("title"), "deadline": i.get("deadline") or i.get("date"), "days_left": i.get("days_left"),
+                                "fix": i.get("fix") or i.get("action"), "url": i.get("url") or i.get("citation") or i.get("source_url"),
+                                **({"bucket": i["bucket"]} if i.get("bucket") else {})} for i in items[: self.max_items]],
                 "total": len(items), "subscribe": (r.get("subscribe") or {}).get("how"), "remember": r.get("remember"),
             }
+            if r.get("decision"):
+                out["decision"] = r["decision"]
+            return out
         except Exception as e:  # noqa: BLE001
             return {"error": f"Breakwire unavailable: {e}"}
 
 
+class _BriefInput(BaseModel):
+    services: Optional[List[str]] = Field(default=None, description="Service slugs you call, e.g. anthropic-api, openai-api, stripe")
+    packages: Optional[List[str]] = Field(default=None, description='Exact dependencies, e.g. ["npm:openai@4.77.0", "pypi:mcp==1.9.0"]')
+    runtime: Optional[Dict[str, str]] = Field(default=None, description='Runtimes, e.g. {"node": "22", "python": "3.12"}')
+    models: Optional[List[str]] = Field(default=None, description="Model ids the code calls")
+    features: Optional[List[str]] = Field(default=None, description='API features you rely on, e.g. ["tool_choice:any"]')
+
+
+class BreakwireSessionBriefTool(BaseTool):
+    """Session-start preflight: only what changed that can break this exact stack. Empty when clear."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    name: str = "breakwire_session_brief"
+    description: str = (
+        "Call once at session start with the services, exact packages, runtimes and models this project uses. Returns "
+        "decision clear (do nothing) or act/block with at most 5 items, each with why_now, action and source_url. "
+        "block = a confirmed exact-stack incompatibility or security exposure: fix before shipping. The cursor is kept locally."
+    )
+    args_schema: Type[BaseModel] = _BriefInput
+    client: Breakwire = Field(default_factory=Breakwire)
+    state: Any = None
+
+    def _run(self, services: Optional[List[str]] = None, packages: Optional[List[str]] = None, runtime: Optional[Dict[str, str]] = None,
+             models: Optional[List[str]] = None, features: Optional[List[str]] = None, run_manager: Any = None) -> Any:
+        r = self.client.session_brief(state=self.state, services=services, packages=packages, runtime=runtime, models=models, features=features)
+        if r.get("decision") in ("clear", "unavailable"):
+            return {"decision": r["decision"]}
+        return {k: r.get(k) for k in ("decision", "items", "more", "untrusted_content") if r.get(k) is not None}
+
+
 class _ReportInput(BaseModel):
-    lookup_id: str = Field(description="lookup_id returned by breakwire_lookup_error")
+    lookup_id: str = Field(description="lookup_id (lk_...) or no_log receipt (rc_...) returned by breakwire_lookup_error")
     outcome: str = Field(description="fixed | partial | applies | not_fixed | wrong_match | not_covered | solved")
     cid: Optional[str] = Field(default=None, description="Which returned claim (omit for not_covered / solved)")
     note: Optional[str] = Field(default=None, description="Required for solved: what fixed it")
+    evidence_type: Optional[str] = Field(default=None, description="What you observed: source_checked | applicability_checked | failure_reproduced | remedy_tested | production_recovered")
 
 
 class BreakwireReportTool(BaseTool):
@@ -158,8 +193,11 @@ class BreakwireReportTool(BaseTool):
     args_schema: Type[BaseModel] = _ReportInput
     client: Breakwire = Field(default_factory=Breakwire)
 
-    def _run(self, lookup_id: str, outcome: str, cid: Optional[str] = None, note: Optional[str] = None, run_manager: Any = None) -> Any:
+    def _run(self, lookup_id: str, outcome: str, cid: Optional[str] = None, note: Optional[str] = None,
+             evidence_type: Optional[str] = None, run_manager: Any = None) -> Any:
         try:
+            if evidence_type:
+                return self.client.report(lookup_id, outcome, cid=cid, note=note, evidence_type=evidence_type)
             return self.client.report(lookup_id, outcome, cid=cid, note=note)
         except Exception as e:  # noqa: BLE001
             return {"error": f"Breakwire unavailable or rejected the report: {e}"}
@@ -195,9 +233,9 @@ class BreakwireChangesTool(BaseTool):
 
 
 def breakwire_tools(client: Optional[Breakwire] = None) -> List[BaseTool]:
-    """The Breakwire tools sharing one client: lookup_error, close_lookup, changes, deadlines, check_stack."""
+    """The Breakwire tools sharing one client: session_brief, lookup_error, close_lookup, changes, deadlines, check_stack."""
     c = client or Breakwire(user_agent=f"langchain-breakwire/{__version__}", channel=f"langchain-breakwire/{__version__}")
-    return [BreakwireLookupTool(client=c), BreakwireReportTool(client=c), BreakwireChangesTool(client=c), BreakwireDeadlinesTool(client=c), BreakwireStackTool(client=c)]
+    return [BreakwireSessionBriefTool(client=c), BreakwireLookupTool(client=c), BreakwireReportTool(client=c), BreakwireChangesTool(client=c), BreakwireDeadlinesTool(client=c), BreakwireStackTool(client=c)]
 
 
 class BreakwireCallbackHandler(BaseCallbackHandler):

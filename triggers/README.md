@@ -1,6 +1,6 @@
 # Trigger packages
 
-Same three triggers in three formats (the text lives in [TRIGGERS.md](TRIGGERS.md)):
+Same triggers in three formats (the text lives in [TRIGGERS.md](TRIGGERS.md)):
 
 | Tool | File | Install |
 |---|---|---|
@@ -8,5 +8,6 @@ Same three triggers in three formats (the text lives in [TRIGGERS.md](TRIGGERS.m
 | Cursor | [`cursor/.cursor/rules/breakwire.mdc`](cursor/.cursor/rules/breakwire.mdc) | copy into your repo's `.cursor/rules/` |
 | Any agent reading AGENTS.md | [`AGENTS.md`](AGENTS.md) | paste the block into your `AGENTS.md` |
 
-Triggers: (1) an error you do not recognise, (2) code that names a model id or SDK version, (3) a deploy or upgrade.
-Step one in every case: `GET https://breakwire.org/api/changes?from=<your training cutoff>`. Fail open.
+Triggers: (0) session start: `POST https://breakwire.org/api/session-brief` (MCP `session_brief`), silent when clear;
+(1) an error you do not recognise, (2) code that names a model id or SDK version, (3) a deploy or upgrade.
+For 1-3, step one is `GET https://breakwire.org/api/changes?from=<your training cutoff>`. Fail open.

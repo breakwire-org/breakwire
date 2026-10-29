@@ -259,15 +259,16 @@ class Stack(unittest.TestCase):
         with mock.patch.object(bwc, "_opener", op):
             b = Breakwire()
             b.stack(files=files)
-            self.assertEqual(op.calls[0]["body"], preview_stack(files=files))
-            self.assertEqual(op.calls[0]["body"], b.preview_stack(files=files))
+            modes = {"strict": True, "compact": True, "include_related": False}  # 0.7.0 defaults, added by stack()
+            self.assertEqual(op.calls[0]["body"], {**preview_stack(files=files), **modes})
+            self.assertEqual(op.calls[0]["body"], {**b.preview_stack(files=files), **modes})
             self.assertNotIn("files", op.calls[0]["body"])
             self.assertNotIn(b"scripts", op.calls[0]["raw"])
             b.stack(files=files, raw_files=True)
-            self.assertEqual(op.calls[1]["body"], {"files": files})
+            self.assertEqual(op.calls[1]["body"], {"files": files, **modes})
             self.assertEqual(preview_stack(files=files, raw_files=True), {"files": files})
             b.stack(dependencies={"next": "16.0.1", "x": "file:../x"}, packages=["pypi:mcp==1.9.0"], services=["stripe-api"])
-            self.assertEqual(op.calls[2]["body"], {"dependencies": {"next": "16.0.1"}, "packages": ["pypi:mcp==1.9.0"], "services": ["stripe-api"]})
+            self.assertEqual(op.calls[2]["body"], {"dependencies": {"next": "16.0.1"}, "packages": ["pypi:mcp==1.9.0"], "services": ["stripe-api"], **modes})
 
     def test_subscribe_and_update_parse_locally(self):
         op = FakeOpener(lambda call, n: (200, {}, {"id": "sub_" + "a" * 24}))

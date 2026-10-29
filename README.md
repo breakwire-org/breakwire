@@ -1,7 +1,7 @@
 # Breakwire clients, MCP config and CI check
 
 <!-- versions:begin (generated from versions.json by scripts/versions.mjs; do not edit) -->
-**Current release:** clients **0.6.0** (npm `breakwire`, PyPI `breakwire`, PyPI `langchain-breakwire`) · server **0.9.0** · GitHub Action `breakwire-check` **1.2.0** · [CHANGELOG](https://github.com/breakwire-org/breakwire/blob/main/CHANGELOG.md)
+**Current release:** clients **0.7.0** (npm `breakwire`, PyPI `breakwire`, PyPI `langchain-breakwire`) · server **0.10.0** · GitHub Action `breakwire-check` **1.2.0** · [CHANGELOG](https://github.com/breakwire-org/breakwire/blob/main/CHANGELOG.md)
 <!-- versions:end -->
 
 [Breakwire](https://breakwire.org) is a source-linked registry of changes that break AI agents: model retirements, API
@@ -41,11 +41,21 @@ with with_breakwire(service="openai-api"):
     client.responses.create(...)   # exception gets .breakwire (id, fix, url) and a traceback note
 ```
 
-## When to call it (the three triggers)
+## When to call it
 
+0. Session start: `session_brief` (MCP) / `sessionBrief()` / `session_brief()` / `npx breakwire brief`. Silent when
+   nothing changed for your exact stack.
 1. An error you do not recognise. 2. Code that names a model id or SDK version. 3. A deploy or upgrade.
-Step one each time: `GET https://breakwire.org/api/changes?from=<your training cutoff>` (changes, new model launches,
+For 1-3, step one: `GET https://breakwire.org/api/changes?from=<your training cutoff>` (changes, new model launches,
 revisions). Fail open: if Breakwire is slow or down, carry on. Details: [triggers/TRIGGERS.md](triggers/TRIGGERS.md).
+
+## What's new in 0.7.0 (clients)
+
+- **Session brief** with a local cursor: `sessionBrief()` / `session_brief()` return `context: null` when clear (inject
+  nothing), else at most 5 source-linked items. Later calls send only a fingerprint and cursor (304 when unchanged).
+- **`npx breakwire brief`** for session-start hooks; the Claude Code plugin runs it on startup.
+- **Stack checks are strict + compact by default.** No-log lookups return a `receipt` you can close with an outcome and
+  `evidence_type`. Details in [CHANGELOG.md](CHANGELOG.md).
 
 ## What's new in 0.6.0 (clients)
 

@@ -3,6 +3,50 @@
 Client packages: npm `breakwire`, PyPI `breakwire`, PyPI `langchain-breakwire` (released together). Versions are
 managed in [versions.json](versions.json).
 
+## 0.7.0 (clients) and server 0.10.0, 2026-10-29
+
+The session habit loop: one cheap call at session start that is silent unless something changed for your exact stack.
+
+### Clients 0.7.0 (npm `breakwire`, PyPI `breakwire`, PyPI `langchain-breakwire`)
+
+- **Session brief.** JS `bw.sessionBrief(stack, { budgetTokens, state })`, Python `bw.session_brief(state=..., **stack)`.
+  The first call sends the parsed stack facts; later calls send only the stored `stack_fingerprint` and cursor with
+  `If-None-Match`, so an unchanged answer is a 304. State lives in `~/.breakwire/session-brief.json` (mode 0600;
+  `BREAKWIRE_STATE_DIR` overrides; a store object or `false` for memory only). The cursor advances only past a clear
+  brief, so act/block items come back until they are resolved. `context` is `null` when clear: inject nothing.
+  Fail-open: any error gives `decision: "unavailable"`, `context: null`.
+- **CLI.** `npx breakwire brief [dir]` reads package.json, requirements.txt, pyproject.toml, .nvmrc, .node-version and
+  .python-version, sends only the parsed facts, and prints nothing when clear or unavailable. `BREAKWIRE_SERVICES`,
+  `BREAKWIRE_MODELS`, `BREAKWIRE_FEATURES` add facts; `BREAKWIRE_BRIEF=0` turns it off.
+- **Stack checks default to strict + compact** (`include_related: false`). Pass `strict: false` / `includeRelated: true`
+  (Python `strict=False, include_related=True`) for the full report. `models`, `features` and `installed` pass through.
+- **No-log receipts.** A `no_log` lookup with a match returns `persistence.receipt` (`rc_...`). `report("rc_...", outcome)`
+  closes it through `POST /api/receipts` (fixed / partial / applies / not_fixed / wrong_match). Nothing about the error is
+  stored.
+- `report()` takes `evidenceType` / `evidence_type` (source_checked, applicability_checked, failure_reproduced,
+  remedy_tested, production_recovered), plus `intervention` and `verification` for claim reports.
+- Types for the 0.9.0 lookup contract: `lifecycle_context`, `not_applicable`, `diagnostic_fork`, per-match `citation`
+  and `equivalent`, `persistence.receipt`.
+- LangChain: new `breakwire_session_brief` tool (first in `breakwire_tools()`); `breakwire_close_lookup` accepts receipts
+  and `evidence_type`; `breakwire_check_stack` reads compact items.
+
+### Editor kits
+
+- Claude Code plugin 0.4.0: a `SessionStart` hook runs `npx -y breakwire@0.7.0 brief` (silent when clear); the skill
+  calls `session_brief` first. Cursor rule, AGENTS.md block and GEMINI.md (extension 0.8.0) call the brief at session
+  start and close lookups with a receipt and `evidence_type`.
+
+### Server 0.10.0 (breakwire.org)
+
+- `POST /api/session-brief`: decision clear / act / block for an exact stack, at most 5 items ordered by must-act-now,
+  each with `why_now`, `applies`, `action`, `deadline` (date, semantics, days_left), `evidence` and `source_url`. Clear
+  answers are a few hundred bytes with an ETag (304 when unchanged); act/block fits a 2,500-byte budget. block only for a
+  confirmed exact-stack incompatibility or security exposure.
+- MCP: the default `/mcp` lists 3 tools (`session_brief`, `lookup_error`, `close_lookup`); `/mcp/full` (or
+  `?profile=full`) lists all 21. Every tool stays callable by name.
+- `POST /api/receipts`: close a no-log lookup receipt with an outcome and `evidence_type`. `/api/stats` reports closure
+  rate per channel and session-brief counts.
+
 ## 1.2.0 (Action `breakwire-check`) and server 0.9.0, 2026-10-29
 
 ### Action 1.2.0

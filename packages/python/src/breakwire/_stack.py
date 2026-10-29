@@ -334,7 +334,24 @@ def normalize_stack(inp: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         body["runtime"] = dict(sorted(rt.items()))
     if uses:
         body["workflows"] = ["\n".join(f"uses: {u}" for u in sorted(uses))]
+    # 0.7.0 (server 0.9.0+): model ids, feature flags and installed versions are facts: cleaned and passed through
+    for key in ("models", "features"):
+        vals = inp.get(key)
+        if isinstance(vals, (list, tuple)):
+            seen: List[str] = []
+            for x in vals:
+                if isinstance(x, str) and x.strip() and "://" not in x and x.strip()[:100] not in seen:
+                    seen.append(x.strip()[:100])
+            if seen:
+                body[key] = seen[:50]
+    inst = inp.get("installed")
+    if isinstance(inst, dict):
+        clean = {str(k): str(v)[:64] for k, v in inst.items() if isinstance(v, (str, int, float)) and re.match(r"^[@\w./:-]{1,214}$", str(k))}
+        if clean:
+            body["installed"] = dict(sorted(clean.items()))
     for k, v in inp.items():
+        if k in ("models", "features", "installed"):
+            continue
         if k in _RAW_KEYS or k in body or k in STACK_FIELDS:
             continue
         if isinstance(v, (bool, int, float)):
