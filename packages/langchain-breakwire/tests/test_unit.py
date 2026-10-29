@@ -56,7 +56,7 @@ class T(unittest.TestCase):
         self.assertTrue(BreakwireStackTool(client=f).invoke({})["empty"])
         names = [t.name for t in breakwire_tools(client=f)]
         self.assertEqual(names, ["breakwire_lookup_error", "breakwire_close_lookup", "breakwire_changes", "breakwire_deadlines", "breakwire_check_stack"])
-        self.assertEqual(__version__, "0.3.0")
+        self.assertEqual(__version__, "0.4.0")
 
     def test_callback_handler_no_log_default(self):
         f = Fake()

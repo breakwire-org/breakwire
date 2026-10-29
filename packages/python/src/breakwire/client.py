@@ -11,7 +11,7 @@ from typing import Any, Dict, Iterable, List, Optional, Union
 
 from ._redact import redact_secrets
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 LOOKUP_OUTCOMES = ("fixed", "partial", "applies", "not_fixed", "wrong_match", "not_covered", "solved")
 DEFAULT_BASE_URL = "https://breakwire.org"
 _CID = re.compile(r"^AN-\d{4}-\d{4,}$")
@@ -134,11 +134,14 @@ class Breakwire:
     def lookup(self, error: Any, service: Optional[str] = None, sdk: Optional[str] = None, version: Optional[str] = None,
                model: Optional[str] = None, http_status: Optional[int] = None, context: Optional[str] = None,
                cross_service: bool = False, log_miss: bool = True, no_log: bool = False, compact: bool = False,
-               max_matches: Optional[int] = None, min_score: Optional[float] = None) -> Dict[str, Any]:
+               max_matches: Optional[int] = None, min_score: Optional[float] = None,
+               since: Optional[str] = None, reflex: bool = True) -> Dict[str, Any]:
         """Match an error (exception or text) against documented signatures and claims. Redacted before sending.
 
         no_log=True: the server answers but stores nothing about this lookup (the error-path helpers default to it).
         compact=True: short, token-cheap answer. max_matches (1-10) and min_score (0-1) trim the matches server-side.
+        since='YYYY-MM-DD': on a miss, count the service's changes since that date. reflex=False drops the snippet.
+        The answer carries `cite` (claim URL), `please` (on an exact match) and `miss` (gap ticket, nearest claims).
         Fail open: if Breakwire is slow or down this raises BreakwireError; the error-path helpers never raise.
         """
         body: Dict[str, Any] = {"error": self.redact(error_text(error))}
@@ -167,7 +170,17 @@ class Breakwire:
             body["max_matches"] = max(1, min(10, int(max_matches)))
         if min_score is not None:
             body["min_score"] = max(0.0, min(1.0, float(min_score)))
+        if since:
+            body["since"] = since
+        if reflex is False:
+            body["reflex"] = False
         return self.request("POST", "/api/lookup", body)
+
+    def gap(self, gap_id: str) -> Dict[str, Any]:
+        """Status of a gap ticket returned on a miss, e.g. gap("UX-0123456789")."""
+        if not re.match(r"^UX-[0-9a-f]{10}$", gap_id or ""):
+            raise ValueError(f"not a gap id: {gap_id!r}")
+        return self.request("GET", f"/api/gaps/{gap_id}")
 
     def deadlines(self, service: Optional[str] = None, kind: Optional[str] = None, limit: Optional[int] = None) -> List[Dict[str, Any]]:
         """Upcoming act-by dates, soonest first."""

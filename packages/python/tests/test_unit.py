@@ -296,7 +296,7 @@ class T(unittest.TestCase):
         self.assertEqual(orig.breakwire.id, "AN-2026-0025")
         self.assertEqual(o2.breakwire.id, "AN-2026-0025")
 
-    # ---- 0.3.0 parity ----
+    # ---- 0.4.0 parity ----
     def test_report_all_lookup_outcomes(self):
         c = bw()
         for o in ("fixed", "partial", "applies", "not_fixed", "wrong_match", "not_covered"):
@@ -316,7 +316,7 @@ class T(unittest.TestCase):
 
     # ---- 0.2.0 ----
     def test_version(self):
-        self.assertEqual(__version__, "0.3.0")
+        self.assertEqual(__version__, "0.4.0")
 
     def test_explain_no_log_default_and_cache(self):
         clear_cache()

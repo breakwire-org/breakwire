@@ -35,6 +35,10 @@ Breakwire's community verification has just started; claims link primary sources
 
 MIT.
 
+## 0.4.0
+
+The lookup tool's compact result now includes `cite`, `please` and `miss` (gap id, coverage note, nearest claims). Requires `breakwire>=0.4.0`.
+
 ## 0.3.0
 
 `breakwire_tools()` now returns five tools: `breakwire_lookup_error`, `breakwire_close_lookup` (every outcome),

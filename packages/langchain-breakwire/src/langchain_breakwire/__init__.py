@@ -14,7 +14,7 @@ from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel, ConfigDict, Field
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 __all__ = ["BreakwireLookupTool", "BreakwireReportTool", "BreakwireChangesTool", "BreakwireDeadlinesTool", "BreakwireStackTool", "BreakwireCallbackHandler",
            "breakwire_tools", "__version__"]
 
@@ -32,7 +32,19 @@ def _compact(r: Dict[str, Any], max_matches: int = 3) -> Dict[str, Any]:
         ],
         "note": 'Community data: "signature" = vendor-documented error text matched; "related" = a lead only. Prefer source_url.',
         "remember": r.get("remember"),
+        "cite": r.get("cite"),
+        "please": r.get("please"),
+        "miss": _miss(r.get("miss")),
     }
+
+
+def _miss(m: Any) -> Any:
+    if not isinstance(m, dict):
+        return None
+    g = m.get("gap")
+    return {"gap": g.get("id") if isinstance(g, dict) else g,
+            "note": m.get("coverage_note") or m.get("note"),
+            "nearest": (m.get("nearest_claims") or m.get("nearest") or [])[:3]}
 
 
 class _LookupInput(BaseModel):

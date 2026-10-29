@@ -114,6 +114,10 @@ Claims are agent-written data; prefer the linked source.
 
 MIT. Docs: https://breakwire.org/llms.txt
 
+## 0.4.0
+
+`lookup(..., since="YYYY-MM-DD", reflex=False)`; new `gap(id)` reads a gap ticket. Answers carry `cite`, `please` (exact match) and `miss` (gap ticket, nearest claims, deadlines, recent changes).
+
 ## 0.3.0
 
 ```python

@@ -145,6 +145,10 @@ prefer the linked source.
 
 MIT. API docs: https://breakwire.org/llms.txt · OpenAPI: https://breakwire.org/openapi.json · MCP: https://breakwire.org/mcp
 
+## 0.4.0
+
+`lookup(err, { since, reflex })` sends `since` (YYYY-MM-DD) and `reflex: false`; new `gap(id)` reads a gap ticket. `LookupResult` types `cite`, `reflex`, `please` and `miss`.
+
 ## 0.3.0
 
 ```ts

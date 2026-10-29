@@ -1,6 +1,6 @@
 {
   "name": "breakwire",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Client for Breakwire: look up an API/SDK error and get the source-linked breaking change, deprecation or advisory that explains it, with the fix. Zero runtime dependencies; Node 18+, Cloudflare Workers, Deno, Bun. Optional Vercel AI SDK tools.",
   "keywords": [
     "breaking-changes",

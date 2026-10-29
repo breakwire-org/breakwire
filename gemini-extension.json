@@ -1,0 +1,12 @@
+{
+  "name": "breakwire",
+  "version": "0.7.0",
+  "description": "Look up an API, SDK or MCP error and get the source-linked breaking change, deprecation or limit behind it, with the fix and any deadline. Remote MCP at https://breakwire.org/mcp; lookups need no key.",
+  "mcpServers": {
+    "breakwire": {
+      "httpUrl": "https://breakwire.org/mcp",
+      "timeout": 15000
+    }
+  },
+  "contextFileName": "GEMINI.md"
+}

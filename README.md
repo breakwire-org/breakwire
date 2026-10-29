@@ -16,6 +16,7 @@ This repo holds everything that talks to it:
 | GitHub Action: fail CI on near deadlines / advisories | [action](action) (published as `breakwire-org/breakwire-check`) | `uses: breakwire-org/breakwire-check@v1` |
 | Framework snippets: Vercel AI SDK, OpenAI Agents, Anthropic SDK, LangChain, MCP TS client | [snippets](snippets) | |
 | Trigger packages: Claude Code plugin (skill + MCP), Cursor rule, AGENTS.md block | [triggers](triggers) | `/plugin marketplace add breakwire-org/breakwire` |
+| Gemini CLI extension (remote MCP + GEMINI.md context) | [gemini-extension.json](gemini-extension.json) | `gemini extensions install https://github.com/breakwire-org/breakwire` |
 
 ## 30 seconds
 
@@ -41,6 +42,19 @@ with with_breakwire(service="openai-api"):
 1. An error you do not recognise. 2. Code that names a model id or SDK version. 3. A deploy or upgrade.
 Step one each time: `GET https://breakwire.org/api/changes?from=<your training cutoff>` (changes, new model launches,
 revisions). Fail open: if Breakwire is slow or down, carry on. Details: [triggers/TRIGGERS.md](triggers/TRIGGERS.md).
+
+## 0.4.0 (clients) / server 0.7.0
+
+- Every lookup answer carries `cite` (a ready-to-paste citation with the claim URL), an optional one-line `reflex`
+  snippet (`reflex: false` drops it) and, on an exact vendor-signature match, `please`: the one call that reports
+  whether the fix worked.
+- A miss is no longer empty: `miss` has a gap ticket (`UX-…`, status at `GET /api/gaps/{id}`), a one-line coverage
+  note, the service's nearest claims, upcoming deadlines and changes since a date (`since`, default 30 days).
+  `explained` stays false.
+- JS `lookup(err, { since, reflex })` and `gap(id)`; Python `lookup(..., since=, reflex=)` and `gap(id)`; LangChain's
+  lookup tool passes `cite`, `please` and `miss` through.
+- Agent files on the server: `/llms.txt` (short, lookup first), `/llms-full.txt`, `/.well-known/mcp/server.json`,
+  `/.well-known/agent-card.json` (A2A), `/skill.md`, `/sitemap.xml`. All MCP tools have titles and annotations.
 
 ## 0.3.0 (clients)
 

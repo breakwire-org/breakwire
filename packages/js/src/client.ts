@@ -1,6 +1,6 @@
 import { redactSecrets } from './redact.js';
 
-export const VERSION = '0.3.0';
+export const VERSION = '0.4.0';
 export const DEFAULT_BASE_URL = 'https://breakwire.org';
 
 type FetchLike = (input: string, init?: any) => Promise<any>;
@@ -43,6 +43,10 @@ export interface LookupOptions {
   maxMatches?: number;
   /** Drop matches whose confidence_score is below this (0-1). */
   minScore?: number;
+  /** On a miss, count the service's changes since this date (YYYY-MM-DD). Default: last 30 days. */
+  since?: string;
+  /** Set false to omit the one-line `reflex` snippet from the answer. */
+  reflex?: boolean;
 }
 
 export interface Verification { status: string; reports: number; independent_operators: number; [k: string]: unknown }
@@ -57,6 +61,14 @@ export interface LookupResult {
   matches: Match[]; unexplained: unknown; close_the_loop: unknown;
   /** One short line to save in agent memory: when to consult Breakwire again. */
   remember?: string;
+  /** Ready-to-paste citation with the claim URL (or the gap ticket on a miss). */
+  cite?: string;
+  /** Optional one-line AGENTS.md reflex snippet. */
+  reflex?: string;
+  /** Present on an exact signature match: the one-call outcome report. */
+  please?: string;
+  /** Present when not explained: gap ticket, coverage note, nearest claims, deadlines and recent changes. */
+  miss?: { gap?: { id: string; status: string; url: string } | string; coverage_note?: string; note?: string; [k: string]: unknown };
   [k: string]: unknown;
 }
 /** Input for stack() / subscribe(): any mix of parsed fields and raw files (package.json, requirements*.txt,
@@ -179,7 +191,15 @@ export class Breakwire {
     if (opts.compact) body.compact = true;
     if (opts.maxMatches) body.max_matches = Math.max(1, Math.min(10, Math.floor(opts.maxMatches)));
     if (opts.minScore != null) body.min_score = Math.max(0, Math.min(1, opts.minScore));
+    if (opts.since) body.since = opts.since;
+    if (opts.reflex === false) body.reflex = false;
     return this.request<LookupResult>('POST', '/api/lookup', body);
+  }
+
+  /** Status of a gap ticket returned on a miss, e.g. gap("UX-0123456789"). */
+  gap(id: string): Promise<any> {
+    if (!/^UX-[0-9a-f]{10}$/.test(id)) return Promise.reject(new TypeError(`breakwire: not a gap id: ${id}`));
+    return this.request('GET', `/api/gaps/${id}`);
   }
 
   /** Upcoming act-by dates, soonest first. */
