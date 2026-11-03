@@ -1,13 +1,22 @@
 # Breakwire clients, MCP config and CI check
 
 <!-- versions:begin (generated from versions.json by scripts/versions.mjs; do not edit) -->
-**Current release:** clients **0.7.0** (npm `breakwire`, PyPI `breakwire`, PyPI `langchain-breakwire`) · server **0.10.0** · GitHub Action `breakwire-check` **1.2.0** · [CHANGELOG](https://github.com/breakwire-org/breakwire/blob/main/CHANGELOG.md)
+**Current release:** clients **0.12.0** (npm `breakwire`, PyPI `breakwire`, PyPI `langchain-breakwire`) · server **0.10.0** · GitHub Action `breakwire-check` **1.2.0** · [CHANGELOG](https://github.com/breakwire-org/breakwire/blob/main/CHANGELOG.md)
 <!-- versions:end -->
 
 [Breakwire](https://breakwire.org) is a source-linked registry of changes that break AI agents: model retirements, API
 deprecations, SDK breaking releases, MCP spec changes and security advisories. Send it an error, get back the claim
 that explains it (e.g. `AN-2026-0025`) with the vendor's documented error string, affected versions, deadline, fix and
 primary source.
+
+## Try it: one call, no key, no install
+
+```bash
+curl -X POST https://breakwire.org/api/lookup -H 'content-type: application/json' -d '{"error":"Error: D1_ERROR: Network connection lost.","compact":true}'
+```
+
+Returns `explained: true` and claim `AN-2026-0143` (the vendor-documented D1 error, the fix and its source). Paste your
+own error text as `"error"`; add `"service"` / `"model"` if you know them, `"no_log": true` to store nothing.
 
 This repo holds everything that talks to it:
 

@@ -1,7 +1,7 @@
 import { redactSecrets } from './redact.js';
 import { normalizeStack } from './stack.js';
 
-export const VERSION = '0.7.0';
+export const VERSION = '0.12.0';
 export const DEFAULT_BASE_URL = 'https://breakwire.org';
 
 type FetchLike = (input: string, init?: any) => Promise<any>;
@@ -72,8 +72,19 @@ export interface Match {
   citation?: string;
   /** Equivalent claims folded into this one (one failure, one decision). */
   equivalent?: string[];
+  /** Server 0.12+: exact_signature | signature_near | sourced_lead | ... (new tiers may appear; treat unknown ones as leads). */
+  tier?: string;
+  /** Server 0.12+: exact | near (case/quote/punctuation/wrap/truncation variant) when a signature matched. */
+  signature_match?: string;
+  /** Compact answers carry `action` (the fix) and `days_left` instead of `fix` / `deadline`. */
+  action?: string | null;
+  days_left?: number | null;
+  /** Server 0.12+: when the claim was first published (forward-only hit accounting). */
+  first_published_at?: string;
   [k: string]: unknown;
 }
+/** Server 0.11.5+: present only when this client is older than the current published client. */
+export interface ClientUpdate { client: string; your_version: string; latest: string; upgrade: string; note?: string; [k: string]: unknown }
 export interface LookupResult {
   lookup_id: string; normalized: string; explained: boolean; service: string | null;
   coverage: { service: string; covered: boolean; note: string | null; covered_services?: string[] } | null;
@@ -96,6 +107,19 @@ export interface LookupResult {
   diagnostic_fork?: { ask?: string; question?: string; options?: unknown[]; [k: string]: unknown };
   /** Server 0.9.0+: what was stored. A no_log lookup with matches carries an opaque receipt (rc_...) you can report on. */
   persistence?: { stored: boolean; reference: string | null; receipt?: string; close?: string; note?: string; url?: string };
+  /** Server 0.11.5+: upgrade hint, only when this client is older than the published one. */
+  client_update?: ClientUpdate;
+  /** Service inferred from the error text when none was given (ranking only, never a filter). */
+  inferred_service?: { service: string; from?: string; note?: string; [k: string]: unknown };
+  [k: string]: unknown;
+}
+/** stack() result (server 0.12). Unknown fields are kept: parse forward-compatibly. */
+export interface StackResult {
+  /** complete | partial | none: how much of the stack Breakwire has data for (none = nothing mapped; not "all clear"). */
+  coverage_state?: 'complete' | 'partial' | 'none' | string;
+  not_covered?: { services?: string[]; packages_without_mapping?: string[]; [k: string]: unknown };
+  /** Compact answers carry the same fact as coverage.state (+ coverage.not_covered). */
+  coverage?: { state?: 'complete' | 'partial' | 'none' | string; not_covered?: { services?: string[]; packages_without_mapping?: string[] }; [k: string]: unknown };
   [k: string]: unknown;
 }
 /** Input for stack() / subscribe(): any mix of parsed fields and raw files (package.json, package-lock.json, yarn.lock,
@@ -412,7 +436,7 @@ export class Breakwire {
   /** package.json fields, files or ["name@version", ...] -> applicable deadlines, advisories and breaking changes.
    * Files are parsed locally and only dependency/runtime facts are sent (previewStack shows the body); { rawFiles: true }
    * sends the raw input instead. An empty stack returns 200 with { empty: true, hint }. */
-  stack(input: StackInput, opts: StackCheckOptions = {}): Promise<any> {
+  stack(input: StackInput, opts: StackCheckOptions = {}): Promise<StackResult & Record<string, any>> {
     const body = { ...previewStack(input, opts) };
     body.strict = opts.strict ?? (input.strict as boolean | undefined) ?? true;
     body.compact = opts.compact ?? (input.compact as boolean | undefined) ?? true;

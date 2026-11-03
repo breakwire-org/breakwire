@@ -122,5 +122,17 @@ class StackDefaults(unittest.TestCase):
         self.assertTrue(op.calls[0]["body"]["include_related"])
 
 
+class V0120(unittest.TestCase):
+    def test_compact_action_is_fix_and_unknown_fields_survive(self):
+        from breakwire.wrap import BreakwireInfo
+        r = {"lookup_id": None, "explained": True, "future_field": 1,
+             "matches": [{"cid": "AN-2026-0143", "title": "T", "confidence": "signature", "tier": "exact_signature", "action": "Retry", "url": "U", "brand_new": 1}]}
+        info = BreakwireInfo.from_result(r)
+        self.assertEqual(info.fix, "Retry")
+        self.assertEqual(info.matches[0]["brand_new"], 1)
+        self.assertEqual(info.matches[0]["tier"], "exact_signature")
+
+
+
 if __name__ == "__main__":
     unittest.main()

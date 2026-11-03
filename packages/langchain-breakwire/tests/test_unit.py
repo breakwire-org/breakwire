@@ -66,6 +66,22 @@ class T(unittest.TestCase):
         self.assertEqual(out["applicable"][0]["url"], "https://nodejs.org/x")
         self.assertEqual(out["applicable"][0]["deadline"], "2026-04-30")
 
+    def test_v0120_compact_lookup_and_coverage_state(self):
+        class C(Fake):
+            def lookup(self, error, **kw):
+                return {"lookup_id": None, "explained": True, "future_field": {"x": 1},
+                        "client_update": {"client": "langchain-breakwire", "your_version": "0.7.0", "latest": "0.12.0", "upgrade": "pip install -U langchain-breakwire"},
+                        "matches": [{"cid": "AN-2026-0143", "title": "T", "confidence": "signature", "tier": "exact_signature", "action": "Retry", "days_left": None, "url": "U", "new_tier_field": 1}]}
+
+            def stack(self, **kw):
+                return {"decision": "clear", "items": [], "coverage": {"state": "none", "not_covered": {"services": ["x"], "packages_without_mapping": []}}}
+        out = BreakwireLookupTool(client=C()).invoke({"error": "boom"})
+        self.assertEqual(out["matches"][0]["fix"], "Retry")
+        self.assertEqual(out["matches"][0]["tier"], "exact_signature")
+        self.assertEqual(out["client_update"]["latest"], "0.12.0")
+        st = BreakwireStackTool(client=C()).invoke({"packages": ["pypi:x==1"]})
+        self.assertEqual(st["coverage"]["state"], "none")
+
     def test_lookup_tool(self):
         f = Fake()
         t = BreakwireLookupTool(client=f)

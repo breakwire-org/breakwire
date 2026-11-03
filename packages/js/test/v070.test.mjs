@@ -86,3 +86,18 @@ test('report(): receipts (rc_) go to /api/receipts with evidence_type; lookups a
   await assert.rejects(bw.report('lk_abc', 'fixed', {}, { evidenceType: 'vibes' }), /evidenceType/);
   assert.ok(EVIDENCE_TYPES.includes('production_recovered'));
 });
+
+// 0.12.0: compact answers (action instead of fix), unknown fields and new tiers are kept; client_update passes through.
+test('0.12.0: explain() reads compact action as fix; unknown fields survive', async () => {
+  const { explain, clearBreakwireCache } = await import('../dist/esm/index.js');
+  clearBreakwireCache();
+  const f = mockFetch(() => ({ body: { lookup_id: null, explained: true, future_field: 1, client_update: { client: 'breakwire-js', your_version: '0.7.0', latest: '0.12.0', upgrade: 'npm install breakwire@latest' },
+    matches: [{ cid: 'AN-2026-0143', title: 'T', confidence: 'signature', tier: 'exact_signature', signature_match: 'exact', action: 'Retry with backoff', days_left: null, url: 'U', brand_new: { x: 1 } }] } }));
+  const info = await explain('Error: D1_ERROR: Network connection lost.', { client: new Breakwire({ fetch: f }), cache: false });
+  assert.equal(info.fix, 'Retry with backoff');
+  assert.equal(info.matches[0].tier, 'exact_signature');
+  assert.deepEqual(info.matches[0].brand_new, { x: 1 });
+  const r = await new Breakwire({ fetch: f }).lookup('x');
+  assert.equal(r.client_update.latest, '0.12.0');
+  assert.equal(r.future_field, 1);
+});

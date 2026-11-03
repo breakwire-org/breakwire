@@ -79,7 +79,7 @@ function makeInfo(r: LookupResult | null, error?: string): BreakwireInfo {
   const m = r?.matches?.[0];
   return {
     lookupId: r?.lookup_id ?? null, explained: !!r?.explained,
-    id: m?.cid ?? null, title: m?.title ?? null, fix: m?.fix ?? null, confidence: m?.confidence ?? null, url: m?.url ?? null, deadline: m?.deadline ?? null,
+    id: m?.cid ?? null, title: m?.title ?? null, fix: m?.fix ?? m?.action ?? null, confidence: m?.confidence ?? null, url: m?.url ?? null, deadline: m?.deadline ?? null,
     matches: r?.matches ?? [], coverage: r?.coverage ?? null, remember: (r?.remember as string | undefined) ?? null, ...(error ? { error } : {}),
   };
 }

@@ -13,7 +13,7 @@ from typing import Any, Dict, Iterable, List, Optional, Union
 from ._redact import redact_secrets
 from ._stack import STACK_FIELDS, normalize_stack
 
-__version__ = "0.7.0"
+__version__ = "0.12.0"
 LOOKUP_OUTCOMES = ("fixed", "partial", "applies", "not_fixed", "wrong_match", "not_covered", "solved")
 #: Outcomes a no_log receipt (rc_...) accepts.
 RECEIPT_OUTCOMES = ("fixed", "partial", "applies", "not_fixed", "wrong_match")

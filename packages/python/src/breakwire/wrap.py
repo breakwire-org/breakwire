@@ -40,7 +40,7 @@ class BreakwireInfo:
         r = r or {}
         m = (r.get("matches") or [{}])[0] if r.get("matches") else {}
         return cls(lookup_id=r.get("lookup_id"), explained=bool(r.get("explained")), id=m.get("cid"), title=m.get("title"),
-                   fix=m.get("fix"), confidence=m.get("confidence"), url=m.get("url"), deadline=m.get("deadline"),
+                   fix=m.get("fix") or m.get("action"), confidence=m.get("confidence"), url=m.get("url"), deadline=m.get("deadline"),
                    matches=r.get("matches") or [], coverage=r.get("coverage"), remember=r.get("remember"), error=error)
 
     def note(self) -> Optional[str]:

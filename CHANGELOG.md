@@ -3,6 +3,19 @@
 Client packages: npm `breakwire`, PyPI `breakwire`, PyPI `langchain-breakwire` (released together). Versions are
 managed in [versions.json](versions.json).
 
+## 0.12.0 (clients), unreleased
+
+Parity with the Breakwire 0.12 API. Client versions jump from 0.7.0 to 0.12.0 to match the server's minor version.
+
+- Forward-compatible parsing: unknown response fields and new match tiers are kept, never rejected.
+- JS types: per-match `tier` (`exact_signature`, `signature_near`, ...), `signature_match`, `action`, `days_left`,
+  `first_published_at`; lookup `client_update` (`ClientUpdate`) and `inferred_service`; `StackResult` with
+  `coverage_state` (full answer) / `coverage.state` (compact). `ClientUpdate` and `StackResult` are exported.
+- Wrappers (JS `withBreakwire`, Python `with_breakwire`): `fix` falls back to the compact answer's `action`.
+- LangChain: lookup results carry `tier`, `days_left` and the `client_update` hint; `check_stack` passes
+  `coverage_state` / `coverage` / `not_covered` through, so an unmapped stack is never read as all clear.
+- READMEs start with a one-call `curl -X POST https://breakwire.org/api/lookup` example.
+
 ## 0.7.0 (clients) and server 0.10.0, 2026-10-29
 
 The session habit loop: one cheap call at session start that is silent unless something changed for your exact stack.

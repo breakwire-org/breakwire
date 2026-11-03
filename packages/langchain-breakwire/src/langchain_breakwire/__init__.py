@@ -14,7 +14,7 @@ from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel, ConfigDict, Field
 
-__version__ = "0.7.0"
+__version__ = "0.12.0"
 __all__ = ["BreakwireSessionBriefTool", "BreakwireLookupTool", "BreakwireReportTool", "BreakwireChangesTool", "BreakwireDeadlinesTool", "BreakwireStackTool", "BreakwireCallbackHandler",
            "breakwire_tools", "__version__"]
 
@@ -26,8 +26,9 @@ def _compact(r: Dict[str, Any], max_matches: int = 3) -> Dict[str, Any]:
         "explained": r.get("explained"),
         "coverage_note": cov.get("note") if cov and not cov.get("covered", True) else None,
         "matches": [
-            {"id": m.get("cid"), "title": m.get("title"), "confidence": m.get("confidence"), "fix": m.get("fix"),
-             "deadline": m.get("deadline"), "url": m.get("url"), "source_url": m.get("source_url")}
+            {"id": m.get("cid"), "title": m.get("title"), "confidence": m.get("confidence"), "tier": m.get("tier"),
+             "fix": m.get("fix") or m.get("action"), "deadline": m.get("deadline"), "days_left": m.get("days_left"),
+             "url": m.get("url"), "source_url": m.get("source_url")}
             for m in (r.get("matches") or [])[:max_matches]
         ],
         "note": 'Community data: "signature" = vendor-documented error text matched; "related" = a lead only. Prefer source_url.',
@@ -35,6 +36,7 @@ def _compact(r: Dict[str, Any], max_matches: int = 3) -> Dict[str, Any]:
         "cite": r.get("cite"),
         "please": r.get("please"),
         "miss": _miss(r.get("miss")),
+        **({"client_update": r["client_update"]} if r.get("client_update") else {}),
     }
 
 
@@ -138,6 +140,10 @@ class BreakwireStackTool(BaseTool):
             }
             if r.get("decision"):
                 out["decision"] = r["decision"]
+            # server 0.12: coverage_state none/partial means "not (fully) covered", never "all clear"
+            for k in ("coverage_state", "coverage", "not_covered"):
+                if r.get(k):
+                    out[k] = r[k]
             return out
         except Exception as e:  # noqa: BLE001
             return {"error": f"Breakwire unavailable: {e}"}
