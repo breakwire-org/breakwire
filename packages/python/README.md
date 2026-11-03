@@ -1,7 +1,7 @@
 # breakwire (Python)
 
 <!-- versions:begin (generated from versions.json by scripts/versions.mjs; do not edit) -->
-**Current release:** clients **0.12.0** (npm `breakwire`, PyPI `breakwire`, PyPI `langchain-breakwire`) · server **0.10.0** · GitHub Action `breakwire-check` **1.2.0** · [CHANGELOG](https://github.com/breakwire-org/breakwire/blob/main/CHANGELOG.md)
+**Current release:** clients **0.12.0** (PyPI `breakwire`, PyPI `langchain-breakwire`; npm `breakwire` 0.7.0 until 0.12.0 is published) · server **0.10.0** · GitHub Action `breakwire-check` **1.2.0** · [CHANGELOG](https://github.com/breakwire-org/breakwire/blob/main/CHANGELOG.md)
 <!-- versions:end -->
 
 ## Try it: one call, no key, no install

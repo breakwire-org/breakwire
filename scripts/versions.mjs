@@ -9,10 +9,13 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const check = process.argv.includes('--check');
 const v = JSON.parse(readFileSync(join(root, 'versions.json'), 'utf8'));
 const C = v.clients, S = v.server, A = v.action;
+// npm_published: set only while npm `breakwire` lags the PyPI clients (e.g. a blocked npm publish). The Claude Code hook pins
+// the npm package, so it must name a version that exists on npm. Remove the key once npm has `clients`.
+const N = v.npm_published || C;
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const banner = `<!-- versions:begin (generated from versions.json by scripts/versions.mjs; do not edit) -->
-**Current release:** clients **${C}** (npm \`breakwire\`, PyPI \`breakwire\`, PyPI \`langchain-breakwire\`) · server **${S}** · GitHub Action \`breakwire-check\` **${A}** · [CHANGELOG](https://github.com/breakwire-org/breakwire/blob/main/CHANGELOG.md)
+**Current release:** clients **${C}** (${N === C ? 'npm \`breakwire\`, ' : ''}PyPI \`breakwire\`, PyPI \`langchain-breakwire\`${N === C ? '' : `; npm \`breakwire\` ${N} until ${C} is published`}) · server **${S}** · GitHub Action \`breakwire-check\` **${A}** · [CHANGELOG](https://github.com/breakwire-org/breakwire/blob/main/CHANGELOG.md)
 <!-- versions:end -->`;
 const BANNER_RE = /<!-- versions:begin[\s\S]*?<!-- versions:end -->/;
 
@@ -26,7 +29,7 @@ const pinned = [
   ['packages/langchain-breakwire/pyproject.toml', [[/^version = "([^"]+)"/m, C], [/"breakwire>=([^"]+)"/, C]]],
   ['packages/langchain-breakwire/src/langchain_breakwire/__init__.py', [[/^__version__ = "([^"]+)"/m, C]]],
   ['action/package.json', [[/"version": "([^"]+)"/, A]]],
-  ['plugins/claude-code/breakwire/hooks/hooks.json', [[/npx -y breakwire@(\d+\.\d+\.\d+)/, C]]],
+  ['plugins/claude-code/breakwire/hooks/hooks.json', [[/npx -y breakwire@(\d+\.\d+\.\d+)/, N]]],
 ];
 const banners = ['README.md', 'packages/js/README.md', 'packages/python/README.md', 'packages/langchain-breakwire/README.md'];
 // Docs that must not advertise another version as current (history lives in CHANGELOG.md / "## x.y.z" sections).

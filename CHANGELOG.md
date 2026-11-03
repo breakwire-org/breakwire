@@ -7,6 +7,9 @@ managed in [versions.json](versions.json).
 
 Parity with the Breakwire 0.12 API. Client versions jump from 0.7.0 to 0.12.0 to match the server's minor version.
 
+PyPI `breakwire` and `langchain-breakwire` 0.12.0 are published; npm `breakwire` 0.12.0 is pending (npm stays at 0.7.0 until then,
+and the Claude Code hook keeps pinning `breakwire@0.7.0` via versions.json `npm_published`).
+
 - Forward-compatible parsing: unknown response fields and new match tiers are kept, never rejected.
 - JS types: per-match `tier` (`exact_signature`, `signature_near`, ...), `signature_match`, `action`, `days_left`,
   `first_published_at`; lookup `client_update` (`ClientUpdate`) and `inferred_service`; `StackResult` with
