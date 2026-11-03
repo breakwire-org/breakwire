@@ -3,7 +3,7 @@
 Client packages: npm `breakwire`, PyPI `breakwire`, PyPI `langchain-breakwire` (released together). Versions are
 managed in [versions.json](versions.json).
 
-## 0.12.0 (clients), unreleased
+## 0.12.0 (clients), 2026-11-03
 
 Parity with the Breakwire 0.12 API. Client versions jump from 0.7.0 to 0.12.0 to match the server's minor version.
 
