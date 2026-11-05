@@ -3,6 +3,10 @@
 Client packages: npm `breakwire`, PyPI `breakwire`, PyPI `langchain-breakwire` (released together). Versions are
 managed in [versions.json](versions.json).
 
+## Unreleased (docs)
+
+- Trigger packages (Claude Code `SKILL.md`, Cursor rule, `AGENTS.md`, `TRIGGERS.md`) document GET `/api/stack` and GET `/api/session-brief` plus the 0.12.0 client upgrade commands. README adds a 0.12.0 "What's new" section so 0.7.0 is no longer the lead.
+
 ## Docs, 2026-11-05
 
 - Action / client READMEs mention GET `/api/stack` and GET `/api/session-brief` (Breakwire 0.12.19 / 0.12.23). The Action and SDKs still POST; curl-only agents and GET-only checkers use the query forms.

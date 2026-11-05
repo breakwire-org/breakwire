@@ -58,12 +58,17 @@ with with_breakwire(service="openai-api"):
 For 1-3, step one: `GET https://breakwire.org/api/changes?from=<your training cutoff>` (changes, new model launches,
 revisions). Fail open: if Breakwire is slow or down, carry on. Details: [triggers/TRIGGERS.md](triggers/TRIGGERS.md).
 
+## What's new in 0.12.0 (clients)
+
+Current clients are **0.12.0** (parity with Breakwire 0.12). Upgrade from 0.1–0.7: `pip install -U breakwire` · `npm i breakwire@latest` · `pip install -U langchain-breakwire`. Details: [CHANGELOG.md](CHANGELOG.md).
+
+- **GET forms (0.12.19 / 0.12.23):** `GET /api/stack?packages=&node=` and `GET /api/session-brief?packages=&node=&services=` match POST. The Action and SDKs still POST; curl-only / GET-only checkers use GET. Docs: https://breakwire.org/llms.txt.
+- Trigger packages (Claude Code skill, Cursor rule, AGENTS.md) now document those GET forms and the 0.12.0 upgrade commands.
+
 ## What's new in 0.7.0 (clients)
 
 - **Session brief** with a local cursor: `sessionBrief()` / `session_brief()` return `context: null` when clear (inject
   nothing), else at most 5 source-linked items. Later calls send only a fingerprint and cursor (304 when unchanged).
-- **GET forms (since 0.12.19 / 0.12.23):** `GET /api/stack?packages=&node=` and `GET /api/session-brief?packages=&node=&services=` match POST. The Action and this SDK still POST; curl-only / Countersign use GET. Docs: https://breakwire.org/llms.txt.
-
 - **`npx breakwire brief`** for session-start hooks; the Claude Code plugin runs it on startup.
 - **Stack checks are strict + compact by default.** No-log lookups return a `receipt` you can close with an outcome and
   `evidence_type`. Details in [CHANGELOG.md](CHANGELOG.md).

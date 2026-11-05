@@ -28,6 +28,8 @@ It returns dated changes, new model launches and claim revisions, each with its 
 - Error text: `POST https://breakwire.org/api/lookup {"error":"<text>","service":"<slug>","model":"<id>","no_log":true}`
   (MCP: `lookup_error`). With `no_log` nothing is stored, and a match carries an opaque `persistence.receipt` (`rc_...`).
 - Dependencies: `POST https://breakwire.org/api/stack {"files":{"package.json":"<contents>"},"strict":true,"compact":true}`.
+- Curl-only / GET-only (Breakwire 0.12.19 / 0.12.23): `GET https://breakwire.org/api/stack?packages=npm:next@16.0.1&node=20` and `GET https://breakwire.org/api/session-brief?packages=...&node=...&services=...` match POST. Bare GET returns accepted fields. Docs: https://breakwire.org/llms.txt.
+- Clients older than 0.12.0: `pip install -U breakwire` · `npm i breakwire@latest` · `pip install -U langchain-breakwire`.
 - After you try a fix, close the lookup once with its `lookup_id` or `receipt` (MCP: `close_lookup`;
   REST: `POST /api/receipts {"receipt":"rc_...","outcome":"fixed"}`). Outcomes: `fixed`, `partial`, `applies`,
   `not_fixed` or `wrong_match`. Lookup ids also take `not_covered` or `solved`. Add `evidence_type`:
