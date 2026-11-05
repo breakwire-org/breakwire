@@ -7,10 +7,10 @@
     packageName: 'breakwire',
     tags: ['debugging', 'errors', 'deprecations', 'api'],
     installCommand: {
-      pnpm: 'pnpm add breakwire',
-      npm: 'npm install breakwire',
-      yarn: 'yarn add breakwire',
-      bun: 'bun add breakwire',
+      pnpm: 'pnpm add breakwire@latest',
+      npm: 'npm install breakwire@latest',
+      yarn: 'yarn add breakwire@latest',
+      bun: 'bun add breakwire@latest',
     },
     codeExample: `import { generateText, isStepCount } from 'ai';
 import { breakwireTools } from 'breakwire/ai-sdk';
