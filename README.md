@@ -1,7 +1,7 @@
 # Breakwire clients, MCP config and CI check
 
 <!-- versions:begin (generated from versions.json by scripts/versions.mjs; do not edit) -->
-**Current release:** clients **0.12.0** (npm `breakwire`, PyPI `breakwire`, PyPI `langchain-breakwire`) · server **0.10.0** · GitHub Action `breakwire-check` **1.2.0** · [CHANGELOG](https://github.com/breakwire-org/breakwire/blob/main/CHANGELOG.md)
+**Current release:** clients **0.12.0** (npm `breakwire`, PyPI `breakwire`, PyPI `langchain-breakwire`) · server **0.12.26** · GitHub Action `breakwire-check` **1.2.0** · [CHANGELOG](https://github.com/breakwire-org/breakwire/blob/main/CHANGELOG.md)
 <!-- versions:end -->
 
 [Breakwire](https://breakwire.org) is a source-linked registry of changes that break AI agents: model retirements, API
@@ -62,7 +62,7 @@ revisions). Fail open: if Breakwire is slow or down, carry on. Details: [trigger
 
 - **Session brief** with a local cursor: `sessionBrief()` / `session_brief()` return `context: null` when clear (inject
   nothing), else at most 5 source-linked items. Later calls send only a fingerprint and cursor (304 when unchanged).
-- **GET forms (server 0.12.19 / 0.12.23):** `GET /api/stack?packages=&node=` and `GET /api/session-brief?packages=&node=&services=` match POST. The Action and this SDK still POST; curl-only / Countersign use GET. Docs: https://breakwire.org/llms.txt.
+- **GET forms (since 0.12.19 / 0.12.23):** `GET /api/stack?packages=&node=` and `GET /api/session-brief?packages=&node=&services=` match POST. The Action and this SDK still POST; curl-only / Countersign use GET. Docs: https://breakwire.org/llms.txt.
 
 - **`npx breakwire brief`** for session-start hooks; the Claude Code plugin runs it on startup.
 - **Stack checks are strict + compact by default.** No-log lookups return a `receipt` you can close with an outcome and
