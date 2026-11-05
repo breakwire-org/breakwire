@@ -30,6 +30,11 @@ const pinned = [
   ['packages/langchain-breakwire/src/langchain_breakwire/__init__.py', [[/^__version__ = "([^"]+)"/m, C]]],
   ['action/package.json', [[/"version": "([^"]+)"/, A]]],
   ['plugins/claude-code/breakwire/hooks/hooks.json', [[/npx -y breakwire@(\d+\.\d+\.\d+)/, N]]],
+  // Claude Code caches installed plugins by plugin.json "version" and `claude plugin update` compares only that string,
+  // so a SKILL/hook change with an unchanged version never reaches installed users. Keep it on the clients version and
+  // bump clients (or this pin) whenever plugin content changes. Same for the Gemini CLI extension manifest.
+  ['plugins/claude-code/breakwire/.claude-plugin/plugin.json', [[/"version": "([^"]+)"/, C]]],
+  ['gemini-extension.json', [[/"version": "([^"]+)"/, C]]],
 ];
 const banners = ['README.md', 'packages/js/README.md', 'packages/python/README.md', 'packages/langchain-breakwire/README.md'];
 // Docs that must not advertise another version as current (history lives in CHANGELOG.md / "## x.y.z" sections).

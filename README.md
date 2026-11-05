@@ -31,6 +31,11 @@ This repo holds everything that talks to it:
 | Trigger packages: Claude Code plugin (skill + MCP), Cursor rule, AGENTS.md block | [triggers](triggers) | `/plugin marketplace add breakwire-org/breakwire` |
 | Gemini CLI extension (remote MCP + GEMINI.md context) | [gemini-extension.json](gemini-extension.json) | `gemini extensions install https://github.com/breakwire-org/breakwire` |
 
+Installed the Claude Code plugin or the Gemini extension earlier? Their manifests stayed at 0.4.0 / 0.8.0, and Claude Code only
+refreshes a plugin when that version string changes, so later skill/hook updates (session brief, GET forms, fail-open) never
+reached you. Both now track the clients version (0.12.0). Update with `claude plugin marketplace update breakwire && claude plugin update breakwire@breakwire`
+or `gemini extensions update breakwire`.
+
 ## 30 seconds
 
 ```bash

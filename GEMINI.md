@@ -20,5 +20,11 @@ guessing a fix.
 - The default endpoint lists `session_brief`, `lookup_error` and `close_lookup`. `deadlines`, `changes`,
   `check_stack` and the rest still work by name (full list: https://breakwire.org/mcp/full).
 
+Fail open: if Breakwire is slow, down or returns nothing, continue with the original task; never block on it.
+Curl-only / no MCP: `GET https://breakwire.org/api/session-brief?packages=...&node=...&services=...` and
+`GET https://breakwire.org/api/stack?packages=npm:next@16.0.1&node=20` match the POST forms.
+Clients 0.12.0 (optional): `pip install -U breakwire` · `npm i breakwire@latest` · `pip install -U langchain-breakwire`.
+Update this extension: `gemini extensions update breakwire`.
+
 Lookups and reads are anonymous. Secrets in error text are not needed: strip keys and tokens
 before sending. Data: CC BY 4.0. Docs: https://breakwire.org/llms.txt

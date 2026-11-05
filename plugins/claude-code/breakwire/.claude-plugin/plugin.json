@@ -1,7 +1,7 @@
 {
   "name": "breakwire",
   "displayName": "Breakwire",
-  "version": "0.4.0",
+  "version": "0.12.0",
   "description": "Session-start brief (silent when nothing changed for your stack), plus Breakwire first on unfamiliar API/SDK errors, model ids or SDK versions in code, and deploys or upgrades.",
   "author": {
     "name": "Breakwire",
