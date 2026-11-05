@@ -25,7 +25,7 @@ stack payloads.
 - Only 307/308 preserve the method and body. 301/302/303 on GET/HEAD become a GET; on requests with a body they are
   an error unless the target origin is pinned.
 
-Upgrade with `npm i breakwire@0.6.0` / `pip install -U "breakwire>=0.6.0"`. If you used a custom base URL that
+Fixed in 0.6.0; upgrade to the current 0.12.0 with `npm i breakwire@latest` / `pip install -U breakwire`. If you used a custom base URL that
 redirects to a new host, set the base URL to the final origin (or pin it with `trustedOrigins` / `trusted_origins`).
 Tests: [tests/redirect-cases.json](tests/redirect-cases.json), run by `packages/js/test/v060.test.mjs` and
 `packages/python/tests/test_v060.py`.
