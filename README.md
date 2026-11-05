@@ -62,6 +62,8 @@ revisions). Fail open: if Breakwire is slow or down, carry on. Details: [trigger
 
 - **Session brief** with a local cursor: `sessionBrief()` / `session_brief()` return `context: null` when clear (inject
   nothing), else at most 5 source-linked items. Later calls send only a fingerprint and cursor (304 when unchanged).
+- **GET forms (server 0.12.19 / 0.12.23):** `GET /api/stack?packages=&node=` and `GET /api/session-brief?packages=&node=&services=` match POST. The Action and this SDK still POST; curl-only / Countersign use GET. Docs: https://breakwire.org/llms.txt.
+
 - **`npx breakwire brief`** for session-start hooks; the Claude Code plugin runs it on startup.
 - **Stack checks are strict + compact by default.** No-log lookups return a `receipt` you can close with an outcome and
   `evidence_type`. Details in [CHANGELOG.md](CHANGELOG.md).

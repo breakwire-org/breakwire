@@ -41,6 +41,9 @@ incompatibility or security exposure in this exact stack). The cursor and finger
 `~/.breakwire/session-brief.json` (0600; `state: false` for memory only), so later calls send only those and get a 304
 when nothing changed. Fail-open. From a shell or a session hook: `npx breakwire brief [dir]` prints nothing when clear.
 
+No SDK needed: the same brief and stack check accept GET query forms (`?packages=&node=&services=&models=`),
+so curl-only agents and GET-only checkers can re-run them. The Action still POSTs. See https://breakwire.org/llms.txt.
+
 ## Look up an error
 
 ```ts
