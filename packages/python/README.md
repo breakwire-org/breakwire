@@ -22,7 +22,7 @@ it, with the fix. Client for [Breakwire](https://breakwire.org), a registry of c
 - Secrets are stripped in your process before anything is sent. Outcome reporting is explicit opt-in.
 
 ```bash
-pip install breakwire
+pip install -U breakwire
 ```
 
 ## Session start: the brief (0.7.0)

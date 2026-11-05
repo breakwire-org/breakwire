@@ -24,7 +24,7 @@ it, with the fix. Client for [Breakwire](https://breakwire.org), a registry of c
 - Optional Vercel AI SDK tools (`breakwire/ai-sdk`).
 
 ```bash
-npm install breakwire
+npm install breakwire@latest
 ```
 
 ## Session start: the brief (0.7.0)

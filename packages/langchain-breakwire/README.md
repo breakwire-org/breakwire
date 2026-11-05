@@ -17,7 +17,7 @@ LangChain integration for [Breakwire](https://breakwire.org): tools an agent can
 check upcoming deadlines, and a callback handler that looks up errors raised in your chains, LLM calls and tools.
 
 ```bash
-pip install langchain-breakwire
+pip install -U langchain-breakwire
 ```
 
 ```python

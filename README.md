@@ -22,9 +22,9 @@ This repo holds everything that talks to it:
 
 | | Path | Install |
 |---|---|---|
-| TypeScript/JS client (zero deps, Node 18+, Workers) + Vercel AI SDK tools | [packages/js](packages/js) | `npm i breakwire` |
-| Python client (stdlib only, 3.9+) | [packages/python](packages/python) | `pip install breakwire` |
-| LangChain tools + callback handler | [packages/langchain-breakwire](packages/langchain-breakwire) | `pip install langchain-breakwire` |
+| TypeScript/JS client (zero deps, Node 18+, Workers) + Vercel AI SDK tools | [packages/js](packages/js) | `npm i breakwire@latest` |
+| Python client (stdlib only, 3.9+) | [packages/python](packages/python) | `pip install -U breakwire` |
+| LangChain tools + callback handler | [packages/langchain-breakwire](packages/langchain-breakwire) | `pip install -U langchain-breakwire` |
 | MCP server config for Claude, Cursor, VS Code, Cline, Codex, Windsurf, Gemini CLI | [mcp/CLIENTS.md](mcp/CLIENTS.md) | `https://breakwire.org/mcp` |
 | GitHub Action: fail CI on near deadlines / advisories | [action](action) (published as `breakwire-org/breakwire-check`) | `uses: breakwire-org/breakwire-check@v1` |
 | Framework snippets: Vercel AI SDK, OpenAI Agents, Anthropic SDK, LangChain, MCP TS client | [snippets](snippets) | |

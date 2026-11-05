@@ -5,6 +5,7 @@ managed in [versions.json](versions.json).
 
 ## Unreleased (docs)
 
+- Kit README install table and package READMEs use upgrade-friendly install commands (`npm i breakwire@latest`, `pip install -U breakwire`, `pip install -U langchain-breakwire`) so re-running the default install pulls current 0.12.0 instead of keeping an already-installed old-tail pin.
 - Claude Code plugin manifest `version` 0.4.0 → 0.12.0 and Gemini extension manifest 0.8.0 → 0.12.0. Claude Code caches plugins by that version string and `claude plugin update` compares only it, so SKILL/hook changes since 0.4.0 (session brief, `breakwire@0.12.0` hook, GET forms, upgrade lines) never reached installed users. `scripts/versions.mjs` now pins both to the clients version. GEMINI.md adds the fail-open line, the curl GET forms and the client upgrade commands.
 - Trigger packages (Claude Code `SKILL.md`, Cursor rule, `AGENTS.md`, `TRIGGERS.md`) document GET `/api/stack` and GET `/api/session-brief` plus the 0.12.0 client upgrade commands. README adds a 0.12.0 "What's new" section so 0.7.0 is no longer the lead.
 
